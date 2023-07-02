@@ -5,11 +5,20 @@ from scipy.linalg import hadamard
 
 class Pattern:
 
-    def __init__(self, resX, resY):
-        self.resX = resX
-        self.resY = resY
-        x = np.linspace(0, resX, resX)
-        y = np.linspace(0, resY, resY)
+    def __init__(self, res_x, res_y, grayphase=112):
+        """
+
+        Parameters
+        ----------
+        res_x
+        res_y
+        grayphase
+        """
+        self.res_x = res_x
+        self.res_y = res_y
+        self.grayphase = grayphase
+        x = np.linspace(0, res_x, res_x)
+        y = np.linspace(0, res_y, res_y)
         self.X, self.Y = np.meshgrid(x, y)
 
     def mirror(self, gray=0):
@@ -26,11 +35,11 @@ class Pattern:
 
         """
         # create a 2d array
-        rows = self.resX
-        cols = self.resY
+        rows = self.res_x
+        cols = self.res_y
 
         # make sure that the image is composed by 8bit integers between 0 and 255
-        pattern = np.array([[gray for i in range(rows)] for j in range(cols)]).astype('uint8')
+        pattern = np.array([[gray for _ in range(rows)] for _ in range(cols)]).astype('uint8')
         # pattern = np.full(shape=(s, self.resY),fill_value=gray).astype('uint8')
 
         return pattern
@@ -51,8 +60,8 @@ class Pattern:
         pattern: 2d array
         """
         # create a 2d array
-        rows = self.resX
-        cols = self.resY
+        rows = self.res_x
+        cols = self.res_y
         # make sure that the image is composed by 8bit integers between 0 and 255
         pattern = np.full(shape=(cols, rows), fill_value=0).astype('uint8')
 
@@ -100,7 +109,7 @@ class Pattern:
         pattern = np.round((sq_amp * (0.5 + 0.5 * signal.square(2 * np.pi * self.X / sq_period))).astype('uint8'))
 
         # replace half of the image with a constant value
-        pattern[:self.resY, : int(self.resX / a)] = gray
+        pattern[:self.res_y, : int(self.res_x / a)] = gray
 
         return pattern.astype('uint8')
 
@@ -118,27 +127,78 @@ class Pattern:
         matrices: all the 2d patterns (array)
 
         """
-
-        h = hadamard(order)
+        h = hadamard(2 ** order)
         matrices = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
         return matrices
 
     @staticmethod
     def _get_hadamard_vector(order, i, j):
-        h = hadamard(order)
+        """
+        calculates the (i,j)th vector of a hadamard basis of a given order
+        Parameters
+        ----------
+        order: int
+        i: int
+        j: int
+
+        Returns
+        -------
+        2d array
+
+        """
+        h = hadamard(2 ** order)
         matrix = np.outer(h[i], h[j])
         return matrix
 
-    def hadamard_pattern(self, order, hadamard_vector_idx, gray=0):
+    def _hadamard_int2phase(self, vector):
+        """
+        replaces the elements of an hadamard vector (-1, 1) with the useful slm values (0, pi)
+        one needs to know the grayscale value of the slm that gives a phase shift of pi
+        Parameters
+        ----------
+        vector: 2d array
 
+        Returns
+        -------
+        vector: 2d array
+
+        """
+        vector[vector == -1] = 0     # phi = 0
+        vector[vector == 1] = self.grayphase / 2  # phi = pi
+        return vector
+
+    def hadamard_pattern(self, order, hadamard_vector_idx, gray=0):
+        """
+        creates a hadamard vector and puts it in the middle of the slm screen
+        Parameters
+        ----------
+        order: hadamard matrix order (int)
+        hadamard_vector_idx: input of the index of the hadamard vector (tuple with 2 int)
+        gray: grayscale level of the unaffected slm screen (int)
+
+        Returns
+        -------
+        pattern: 2d array
+
+        """
         # create a 2d array
-        rows = self.resX
-        cols = self.resY
+        rows = self.res_x
+        cols = self.res_y
         # make sure that the image is composed by 8bit integers between 0 and 255
         pattern = np.full(shape=(cols, rows), fill_value=gray).astype('uint8')
 
-        # put in the middle of the SLM screen the hadamard 2d vector
+        # get a 2d hadamard vector
         i, j = hadamard_vector_idx[0], hadamard_vector_idx[1]
         hadamard_vector = self._get_hadamard_vector(order, i, j)
-        subpattern_dim = hadamard_vector.shape
+        # replace values to grayscale-phase values
+        hadamard_vector = self._hadamard_int2phase(hadamard_vector)
 
+        # put it in the middle of the slm screen
+        # first calculate offsets from the image center
+        subpattern_dim = hadamard_vector.shape
+        offset_x = int(rows / 2 - subpattern_dim[0] / 2)
+        offset_y = int(cols / 2 - subpattern_dim[1] / 2)
+        # and then add the vector in the center of the initialized pattern
+        pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = hadamard_vector
+
+        return pattern.astype('uint8')
