@@ -7,7 +7,8 @@ class Pattern:
 
     def __init__(self, res_x, res_y, grayphase=112):
         """
-
+        constructs the pattern class which permits to generate a bunch of patterns ready to upload to
+        a SLM. It needs the resolution of the SLM screen and its calibration grayscale value. 
         Parameters
         ----------
         res_x
