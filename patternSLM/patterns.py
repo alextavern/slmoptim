@@ -108,7 +108,7 @@ class Pattern:
         """
         # make sure that the image is composed by 8bit integers between 0 and 255
         pattern = np.round((sq_amp * (0.5 + 0.5 * signal.square(2 * np.pi * self.X / sq_period))).astype('uint8'))
-
+    
         # replace half of the image with a constant value
         pattern[:self.res_y, : int(self.res_x / a)] = gray
 
@@ -168,13 +168,14 @@ class Pattern:
         vector[vector == 1] = self.grayphase / 2  # phi = pi
         return vector
 
-    def hadamard_pattern(self, order, hadamard_vector_idx, gray=0):
+    def hadamard_pattern(self, order, hadamard_vector_idx, n=1, gray=0):
         """
         creates a hadamard vector and puts it in the middle of the slm screen
         Parameters
         ----------
         order: hadamard matrix order (int)
         hadamard_vector_idx: input of the index of the hadamard vector (tuple with 2 int)
+        n: hadamard vector magnification factor
         gray: grayscale level of the unaffected slm screen (int)
 
         Returns
@@ -191,6 +192,8 @@ class Pattern:
         # get a 2d hadamard vector
         i, j = hadamard_vector_idx[0], hadamard_vector_idx[1]
         hadamard_vector = self._get_hadamard_vector(order, i, j)
+        # enlarge vector
+        hadamard_vector = self._enlarge_pattern(hadamard_vector, n)
         # replace values to grayscale-phase values
         hadamard_vector = self._hadamard_int2phase(hadamard_vector)
 
@@ -203,3 +206,62 @@ class Pattern:
         pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = hadamard_vector
 
         return pattern.astype('uint8')
+
+    def hadamard_pattern_bis(self, vector, n=1, gray=0):
+        """
+        creates a hadamard vector and puts it in the middle of the slm screen
+        Parameters
+        ----------
+        vector: one hadamard vector
+        n: hadamard vector magnification factor
+        gray: grayscale level of the unaffected slm screen (int)
+
+        Returns
+        -------
+        pattern: 2d array
+
+        """
+        # create a 2d array
+        rows = self.res_x
+        cols = self.res_y
+        # make sure that the image is composed by 8bit integers between 0 and 255
+        pattern = np.full(shape=(cols, rows), fill_value=gray).astype('uint8')
+
+        # get a 2d hadamard vector
+        hadamard_vector = vector
+        # enlarge vector
+        hadamard_vector = self._enlarge_pattern(hadamard_vector, n)
+        # replace values to grayscale-phase values
+        hadamard_vector = self._hadamard_int2phase(hadamard_vector)
+
+        # put it in the middle of the slm screen
+        # first calculate offsets from the image center
+        subpattern_dim = hadamard_vector.shape
+        offset_x = int(rows / 2 - subpattern_dim[0] / 2)
+        offset_y = int(cols / 2 - subpattern_dim[1] / 2)
+        # and then add the vector in the center of the initialized pattern
+        pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = hadamard_vector
+
+        return pattern.astype('uint8')
+    @staticmethod
+    def _enlarge_pattern(matrix, n):
+        """
+        it takes as input a 2d matric and augments its dimensions by 2nx2n by conserving the same pattern
+        Parameters
+        ----------
+        matrix: input 2d array
+        n: magnification factor
+
+        Returns
+        -------
+        matrix: enlarged 2d array
+        """
+
+        if n < 1:
+            raise Exception("sorry, magnification factor should not be zero")
+        for i in range(1, n):
+            new_dim = matrix.shape[0] * 2
+            matrix = np.stack((matrix, matrix), axis=1).flatten().reshape(new_dim, int(new_dim / 2))
+            matrix = np.dstack((matrix, matrix)).flatten().reshape(new_dim, new_dim)
+
+        return matrix.astype('uint8')

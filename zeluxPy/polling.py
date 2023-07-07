@@ -12,8 +12,9 @@ from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
 class Cam:
 
-    def __init__(self, roi=(0, 0, 1440, 1080), num_of_frames=10, exposure_time=11000, gain=6, timeout=1000):
+    def __init__(self, roi=(0, 0, 1440, 1080), bins=(1, 1), num_of_frames=10, exposure_time=11000, gain=6, timeout=1000):
         self.roi = roi
+        self.bins = bins
         self.num_of_frames = num_of_frames
         self.gain = float(gain)
         self.exposure_time = exposure_time
@@ -46,6 +47,8 @@ class Cam:
                 # camera.roi = (100, 100, 600, 600)
                 # set roi to be at origin point (100, 100) with a width & height of 500
                 camera.roi = self.roi
+                # set binning for macropixels
+                (camera.binx, camera.biny) = self.bins
 
                 if camera.gain_range.max > 0:
                     db_gain = self.gain
