@@ -1,6 +1,8 @@
 import numpy as np
 from scipy import signal
 from scipy.linalg import hadamard
+import threading
+from tqdm.auto import tqdm
 
 
 class Pattern:
@@ -243,6 +245,7 @@ class Pattern:
         pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = hadamard_vector
 
         return pattern.astype('uint8')
+
     @staticmethod
     def _enlarge_pattern(matrix, n):
         """
@@ -265,3 +268,46 @@ class Pattern:
             matrix = np.dstack((matrix, matrix)).flatten().reshape(new_dim, new_dim)
 
         return matrix.astype('uint8')
+
+
+class SlmUploadPatternsThread(threading.Thread):
+
+    def __init__(self, slm, trigger_event, stop_event, upload_pattern_event, calib_px=112, order=4, mag=5):
+        super(SlmUploadPatternsThread, self).__init__()
+
+        self.slm = slm
+        self.resX, self.resY = slm.getSize()
+        self.calib_px = calib_px
+        self.order = order
+        self.mag = mag
+        self.length = 2 ** order
+
+        self.slm_patterns = Pattern(self.resX, self.resY, calib_px)
+        self.basis = self.slm_patterns._get_hadamard_basis(self.order)
+
+        pi = int(calib_px / 2)
+        self.four_phases = [0, pi / 2, pi, 3 * pi / 2]
+
+        self.trigger_event = trigger_event
+        self.stop_event = stop_event
+        self.upload_pattern_event = upload_pattern_event
+
+    def run(self):
+
+            # loop through each 2d vector of the hadamard basis - basis is already generated here
+            self.upload_pattern_event.set()
+            for idx, vector in enumerate(tqdm(self.basis)):
+                # and for each vector load the four reference phases
+                for phase in tqdm(self.four_phases, leave=False):
+                    pattern = self.slm_patterns.hadamard_pattern_bis(vector, n=self.mag, gray=phase)
+                    self.upload_pattern_event.wait()
+                    self.slm.updateArray(pattern) # load each vector to slm
+                    # send flag to other threads here
+                    self.trigger_event.set()
+                    self.upload_pattern_event.clear()
+#                     if self.trigger_event.is_set():
+#                         print('download pattern')
+            self.stop_event.set()
+#             if self.stop_event.is_set():
+#                 print('stop all')
+            return
