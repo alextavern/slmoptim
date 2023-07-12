@@ -271,8 +271,8 @@ class Pattern:
 
 
 class SlmUploadPatternsThread(threading.Thread):
-
-    def __init__(self, slm, trigger_event, stop_event, upload_pattern_event, calib_px=112, order=4, mag=5):
+    
+    def __init__(self, slm, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, order=4, mag=5):
         super(SlmUploadPatternsThread, self).__init__()
 
         self.slm = slm
@@ -281,33 +281,33 @@ class SlmUploadPatternsThread(threading.Thread):
         self.order = order
         self.mag = mag
         self.length = 2 ** order
-
+        
         self.slm_patterns = Pattern(self.resX, self.resY, calib_px)
         self.basis = self.slm_patterns._get_hadamard_basis(self.order)
-
+        
         pi = int(calib_px / 2)
         self.four_phases = [0, pi / 2, pi, 3 * pi / 2]
-
-        self.trigger_event = trigger_event
-        self.stop_event = stop_event
-        self.upload_pattern_event = upload_pattern_event
-
+        
+        self.download = download_frame_event
+        self.stop = stop_all_event
+        self.upload = upload_pattern_event
+        
     def run(self):
 
             # loop through each 2d vector of the hadamard basis - basis is already generated here
-            self.upload_pattern_event.set()
+            self.upload.set()
             for idx, vector in enumerate(tqdm(self.basis)):
                 # and for each vector load the four reference phases
                 for phase in tqdm(self.four_phases, leave=False):
                     pattern = self.slm_patterns.hadamard_pattern_bis(vector, n=self.mag, gray=phase)
-                    self.upload_pattern_event.wait()
+                    self.upload.wait()
                     self.slm.updateArray(pattern) # load each vector to slm
                     # send flag to other threads here
-                    self.trigger_event.set()
-                    self.upload_pattern_event.clear()
+                    self.download.set()
+                    self.upload.clear()
 #                     if self.trigger_event.is_set():
 #                         print('download pattern')
-            self.stop_event.set()
+           
 #             if self.stop_event.is_set():
 #                 print('stop all')
-            return
+            return  self.stop.set()

@@ -27,24 +27,23 @@ def rotate_frame(frame, angle):
     frame_rot = ndimage.rotate(frame, angle)
     return frame_rot
 
+class CameraThread(threading.Thread):
 
-class CameraConfigThread(threading.Thread):
-
-    def __init__(self, trigger_event, stop_event, upload_pattern_event, roi=(0, 0, 1440, 1080), bins=(1, 1), exposure_time=11000, gain=6, timeout=1000):
-        super(CameraConfigThread, self).__init__()
+    def __init__(self, download_frame_event, upload_pattern_event, stop_all_event, roi=(0, 0, 1440, 1080), bins=(1, 1), exposure_time=11000, gain=6, timeout=1000):
+        super(CameraThread, self).__init__()
         self.roi = roi
         self.bins = bins
         self.gain = float(gain)
         self.exposure_time = exposure_time
         self.timeout = timeout
-
-        self.trigger_event = trigger_event
-        self.stop_event = stop_event
-        self.upload_pattern_event = upload_pattern_event
+        
+        self.download = download_frame_event
+        self.stop = stop_all_event
+        self.upload = upload_pattern_event
         self.frames = None
-
+    
     def run(self):
-
+        
         print("Configuring the USB camera...")
         with TLCameraSDK() as sdk:
             available_cameras = sdk.discover_available_cameras()
@@ -70,40 +69,37 @@ class CameraConfigThread(threading.Thread):
                 camera.arm(2)
 
                 camera.issue_software_trigger()
-
+                
                 # hear put a flag to trigger download
-                download_thread = FrameAcquisitionThread(camera,
-                                                         self.trigger_event,
-                                                         self.stop_event,
-                                                         self.upload_pattern_event,
+                download_thread = FrameAcquisitionThread(camera, 
+                                                         self.download, 
+                                                         self.upload, 
+                                                         self.stop,
                                                          num_of_frames=1)
                 download_thread.start()
                 download_thread.join()
-
+                
+            
                 camera.disarm()
                 camera.dispose()
                 self.frames = download_thread.frames
 
-
 class FrameAcquisitionThread(threading.Thread):
-
-    def __init__(self, camera, trigger_event, stop_event, upload_pattern_event, num_of_frames=1):
+    
+    def __init__(self, camera, download_frame_event, upload_pattern_event, stop_all_event, num_of_frames=1):
         super(FrameAcquisitionThread, self).__init__()
         self.num_of_frames = num_of_frames
         self.camera = camera
-        self.trigger_event = trigger_event
-        self.stop_event = stop_event
-        self.upload_pattern_event = upload_pattern_event
+        self.download = download_frame_event
+        self.stop = stop_all_event
+        self.upload = upload_pattern_event
         self.frames = []
-
-#     def stop(self):
-#         self._stop_event.set()
-
+        
     def run(self):
-
-        while not self.stop_event.is_set():
-            self.trigger_event.wait()
-#             print("Downloading frames from the USB camera...")
+        
+        while not self.stop.is_set():
+            self.download.wait()
+            
             # Download the frames from the camera
             for i in range(self.num_of_frames):
                 frame = self.camera.get_pending_frame_or_null()
@@ -113,7 +109,6 @@ class FrameAcquisitionThread(threading.Thread):
                 else:
                     print("timeout reached during polling, program exiting...")
                     break
-            self.upload_pattern_event.set()
-#             if self.upload_pattern_event.is_set():
-#                 print("upload now bitch!")
-            self.trigger_event.clear()
+                    
+            self.upload.set()
+            self.download.clear() 
