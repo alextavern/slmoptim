@@ -249,7 +249,7 @@ class Pattern:
     @staticmethod
     def _enlarge_pattern(matrix, n):
         """
-        it takes as input a 2d matric and augments its dimensions by 2nx2n by conserving the same pattern
+        it takes as input a 2d matrix and augments its dimensions by 2nx2n by conserving the same pattern
         Parameters
         ----------
         matrix: input 2d array

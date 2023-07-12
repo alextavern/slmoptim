@@ -27,6 +27,7 @@ def rotate_frame(frame, angle):
     frame_rot = ndimage.rotate(frame, angle)
     return frame_rot
 
+
 class CameraThread(threading.Thread):
 
     def __init__(self, download_frame_event, upload_pattern_event, stop_all_event, roi=(0, 0, 1440, 1080), bins=(1, 1), exposure_time=11000, gain=6, timeout=1000):
@@ -78,11 +79,11 @@ class CameraThread(threading.Thread):
                                                          num_of_frames=1)
                 download_thread.start()
                 download_thread.join()
-                
-            
+
                 camera.disarm()
                 camera.dispose()
                 self.frames = download_thread.frames
+
 
 class FrameAcquisitionThread(threading.Thread):
     
@@ -111,4 +112,4 @@ class FrameAcquisitionThread(threading.Thread):
                     break
                     
             self.upload.set()
-            self.download.clear() 
+            self.download.clear()
