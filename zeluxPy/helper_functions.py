@@ -41,6 +41,7 @@ class CameraThread(threading.Thread):
         self.download = download_frame_event
         self.stop = stop_all_event
         self.upload = upload_pattern_event
+
         self.frames = None
     
     def run(self):
@@ -71,8 +72,7 @@ class CameraThread(threading.Thread):
 
                 camera.issue_software_trigger()
                 
-                # hear put a flag to trigger download
-                download_thread = FrameAcquisitionThread(camera, 
+                download_thread = FrameAcquisitionThread(camera,
                                                          self.download, 
                                                          self.upload, 
                                                          self.stop,
@@ -82,6 +82,7 @@ class CameraThread(threading.Thread):
 
                 camera.disarm()
                 camera.dispose()
+
                 self.frames = download_thread.frames
 
 
@@ -89,11 +90,14 @@ class FrameAcquisitionThread(threading.Thread):
     
     def __init__(self, camera, download_frame_event, upload_pattern_event, stop_all_event, num_of_frames=1):
         super(FrameAcquisitionThread, self).__init__()
+
         self.num_of_frames = num_of_frames
         self.camera = camera
+
         self.download = download_frame_event
         self.stop = stop_all_event
         self.upload = upload_pattern_event
+
         self.frames = []
         
     def run(self):
@@ -110,6 +114,5 @@ class FrameAcquisitionThread(threading.Thread):
                 else:
                     print("timeout reached during polling, program exiting...")
                     break
-                    
-            self.upload.set()
             self.download.clear()
+            self.upload.set()
