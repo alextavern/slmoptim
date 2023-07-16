@@ -31,6 +31,26 @@ def rotate_frame(frame, angle):
 class CameraThread(threading.Thread):
 
     def __init__(self, download_frame_event, upload_pattern_event, stop_all_event, roi=(0, 0, 1440, 1080), bins=(1, 1), exposure_time=11000, gain=6, timeout=1000):
+        """This class opens a thread that run in parallel to the SLM thread (see patternSLM/patterns.py)
+        It sets a bunch of thread events that act complementary fo the SLM thread. 
+        First, it opens a thread that configures a zelux thorlabs camera. Then, a nested thread downloads frames from the camera.
+
+        Parameters
+        ----------
+        download_frame_event : thread event
+        upload_pattern_event : thead event
+        stop_all_event : thread event
+        roi : tuple, optional
+            set region of intereset of the camer, by default (0, 0, 1440, 1080)
+        bins : tuple, optional
+            set the camera macropixel size, by default (1, 1)
+        exposure_time : int, optional
+            set camera exposure time, by default 11000
+        gain : int, optional
+            set camera gain, by default 6
+        timeout : int, optional
+            set camera timeout, by default 1000
+        """
         super(CameraThread, self).__init__()
         self.roi = roi
         self.bins = bins
@@ -45,8 +65,12 @@ class CameraThread(threading.Thread):
         self.frames = None
     
     def run(self):
+        """ Inspired by thorlabs sdk example: detect available cameras, set camera properties, arm and trigger. 
+        Then open a nested thread to download one frame from the camera once a pattern is uploaded to the SLM
+        (the slm thread sets the corresponsind thread event).
+        When everything is done, the camera is disarmed and disposed.
+        """
         
-        print("Configuring the USB camera...")
         with TLCameraSDK() as sdk:
             available_cameras = sdk.discover_available_cameras()
             if len(available_cameras) < 1:
@@ -55,10 +79,10 @@ class CameraThread(threading.Thread):
 
             with sdk.open_camera(available_cameras[0]) as camera:
                 camera.exposure_time_us = self.exposure_time  # set exposure to 11 ms
-                camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode
-                camera.image_poll_timeout_ms = self.timeout  # 1 second polling timeout
+                camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode (if 0)
+                camera.image_poll_timeout_ms = self.timeout  # polling timeout
                 camera.roi = self.roi # set roi
-                # set binning for macropixels
+                # set binning for camera macropixels
                 (camera.binx, camera.biny) = self.bins
 
                 if camera.gain_range.max > 0:
@@ -72,6 +96,8 @@ class CameraThread(threading.Thread):
 
                 camera.issue_software_trigger()
                 
+                print("USB camera configured and armed.")
+
                 download_thread = FrameAcquisitionThread(camera,
                                                          self.download, 
                                                          self.upload, 
@@ -89,6 +115,16 @@ class CameraThread(threading.Thread):
 class FrameAcquisitionThread(threading.Thread):
     
     def __init__(self, camera, download_frame_event, upload_pattern_event, stop_all_event, num_of_frames=1):
+        """ 
+        Parameters
+        ----------
+        camera : class object
+            zelux thorlabs SDK
+        download_frame_event : thread event
+        upload_pattern_event : thread event
+        stop_all_event : thread event
+        num_of_frames : int, optional
+        """
         super(FrameAcquisitionThread, self).__init__()
 
         self.num_of_frames = num_of_frames

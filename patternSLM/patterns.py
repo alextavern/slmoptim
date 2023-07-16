@@ -273,6 +273,28 @@ class Pattern:
 class SlmUploadPatternsThread(threading.Thread):
     
     def __init__(self, slm, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, order=4, mag=5):
+        """ This thread is designed to run in paraller with another thread that download frames from a camera. In particular
+        this class uploads a hadamard vector on the SLM, sets a thread event that triggers the other thread to download a frame. 
+        Then, it waits for a thread event to be set from the camera thread to upload the next hadamard vector. 
+        Finally, once all patterns are uploaded to the SLM a thread event is set that stops and closes all threads. 
+
+        It needs an SLM object along with the SLM calibration constant and the hadamard basis parameters.
+
+        Parameters
+        ----------
+        slm : class object
+            slmpy - popoff
+        download_frame_event : thread event
+        upload_pattern_event : thread event
+        stop_all_event : thread event
+        calib_px : int
+            the grayscale value that corresponds to a 2pi modulation, by default 112
+        order : int, optional
+            hadamard matrix order, by default 4
+        mag : int, optional
+            magnification factor of had vector in the SLM active area
+            indirectly it set the SLM macropixel size, by default 5
+        """
         super(SlmUploadPatternsThread, self).__init__()
 
         self.slm = slm
