@@ -207,7 +207,7 @@ class Pattern:
         # and then add the vector in the center of the initialized pattern
         pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = hadamard_vector
 
-        return pattern.astype('uint8')
+        return hadamard_vector, pattern.astype('uint8')
 
     def hadamard_pattern_bis(self, vector, n=1, gray=0):
         """
@@ -244,7 +244,7 @@ class Pattern:
         # and then add the vector in the center of the initialized pattern
         pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = hadamard_vector
 
-        return pattern.astype('uint8')
+        return hadamard_vector, pattern.astype('uint8')
 
     @staticmethod
     def _enlarge_pattern(matrix, n):
@@ -321,7 +321,7 @@ class SlmUploadPatternsThread(threading.Thread):
             for idx, vector in enumerate(tqdm(self.basis)):
                 # and for each vector load the four reference phases
                 for phase in tqdm(self.four_phases, leave=False):
-                    pattern = self.slm_patterns.hadamard_pattern_bis(vector, n=self.mag, gray=phase)
+                    _, pattern = self.slm_patterns.hadamard_pattern_bis(vector, n=self.mag, gray=phase)
                     self.upload.wait()
                     self.slm.updateArray(pattern) # load each vector to slm
                     # send flag to other threads here

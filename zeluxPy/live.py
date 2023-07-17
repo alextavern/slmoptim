@@ -185,7 +185,9 @@ if __name__ == "__main__":
             print("Setting camera parameters...")
             camera.frames_per_trigger_zero_for_unlimited = 0
             camera.roi = (0, 0, 1440, 1080)
+            camera.roi = (520 + 36, 440 + 36, 720 -36 - 1, 640 - 36 - 1)
             # camera.roi=(975, 520, 980, 580)
+            (camera.binx, camera.biny) = (8, 8)
 
             camera.arm(2)
             camera.issue_software_trigger()
