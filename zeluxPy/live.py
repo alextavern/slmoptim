@@ -66,6 +66,7 @@ class LiveViewCanvas(tk.Canvas):
                 self._image_width = self._image.width()
                 self._image_height = self._image.height()
                 self.config(width=self._image_width, height=self._image_height)
+                # self.config(width=800, height=600)
             self.create_image(0, 0, image=self._image, anchor='nw')
         except queue.Empty:
             pass
@@ -184,11 +185,19 @@ if __name__ == "__main__":
 
             print("Setting camera parameters...")
             camera.frames_per_trigger_zero_for_unlimited = 0
+            
+            # middle_x = int(1440 / 2)
+            # middle_y = int(1080 / 2)
+            # dim = 100
+            # roi = (middle_x - dim, middle_y - dim, middle_x + dim, middle_y + dim)
             camera.roi = (0, 0, 1440, 1080)
-            camera.roi = (520 + 36, 440 + 36, 720 -36 - 1, 640 - 36 - 1)
+            # camera.roi = roi
+            # camera.roi = (520 + 36, 440 + 36, 720 -36 - 1, 640 - 36 - 1)
             # camera.roi=(975, 520, 980, 580)
-            (camera.binx, camera.biny) = (8, 8)
-
+            # (camera.binx, camera.biny) = (8, 8)
+            # camera.exposure_time_us = 400
+            # (camera.binx, camera.biny) = (4, 4)
+            
             camera.arm(2)
             camera.issue_software_trigger()
 

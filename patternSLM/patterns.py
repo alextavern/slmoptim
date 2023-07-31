@@ -267,7 +267,7 @@ class Pattern:
             matrix = np.stack((matrix, matrix), axis=1).flatten().reshape(new_dim, int(new_dim / 2))
             matrix = np.dstack((matrix, matrix)).flatten().reshape(new_dim, new_dim)
 
-        return matrix.astype('uint8')
+        return matrix
 
 
 class SlmUploadPatternsThread(threading.Thread):
