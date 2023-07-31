@@ -4,6 +4,8 @@ from slmPy import slmpy
 import threading
 import numpy as np
 import pickle
+from scipy.linalg import hadamard
+import matplotlib.pyplot as plt
 
 """
 """
@@ -90,9 +92,11 @@ class TM:
 
 class calc_TM:
 
-    def __init__(self, data):
+    def __init__(self, data, bins=8, order=4, mag=4):
         self.data = data
-        
+        self.bins = bins
+        self.order = order
+        self.mag = mag
     
     @staticmethod
     def four_phases_method(intensities):
@@ -182,13 +186,23 @@ class calc_TM:
 
         return norm_ij
     
+    def calc_tm_norm(self):
+        tm_obs = self.calc_tm_obs()
+        norm = self.normalization_factor()
+        return tm_obs / norm
+    
+    def change2canonical(self):
+        h = hadamard(2 ** self.order)
+        h = pt.Pattern._enlarge_pattern(h, self.mag)
+        tm = np.dot(self.calc_tm_norm, h)
+        return tm
+    
     def plot_tm(self):
-        #INCOMPLETE#
         fig, axs = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, figsize=(5, 5))
-        axs[0, 0].imshow(abs(tm_obs), aspect='auto')
-        axs[1, 0].imshow(norm, aspect='auto')
-        axs[0, 1].imshow(tm_fil, aspect='auto')
-        axs[1, 1].imshow(tm, aspect='auto')
+        axs[0, 0].imshow(abs(self.calc_tm_obs), aspect='auto')
+        axs[1, 0].imshow(self.normalization_factor, aspect='auto')
+        axs[0, 1].imshow(self.calc_tm_norm, aspect='auto')
+        axs[1, 1].imshow(self.calc_tm_can, aspect='auto')
 
         axs[0, 0].set_title("Hadamard TM")
         axs[1, 0].set_title("Normalization")
