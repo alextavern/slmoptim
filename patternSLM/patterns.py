@@ -3,7 +3,8 @@ from scipy import signal
 from scipy.linalg import hadamard
 import threading
 from tqdm.auto import tqdm
-
+import matplotlib.pyplot as plt
+import time
 
 class Pattern:
 
@@ -309,21 +310,30 @@ class SlmUploadPatternsThread(threading.Thread):
         
         pi = int(calib_px / 2)
         self.four_phases = [0, pi / 2, pi, 3 * pi / 2]
-        
+        self.four_phases = [0]
         self.download = download_frame_event
-        self.stop = stop_all_event
         self.upload = upload_pattern_event
+        self.stop = stop_all_event
+
+        self.patterns = []
         
     def run(self):
 
             # loop through each 2d vector of the hadamard basis - basis is already generated here
             self.upload.set()
-            for idx, vector in enumerate(tqdm(self.basis)):
+            for vector in tqdm(self.basis):
                 # and for each vector load the four reference phases
                 for phase in tqdm(self.four_phases, leave=False):
                     _, pattern = self.slm_patterns.hadamard_pattern_bis(vector, n=self.mag, gray=phase)
                     self.upload.wait()
+                    # if self.upload.is_set():
+                    #     print("uploading pattern now")
                     self.slm.updateArray(pattern) # load each vector to slm
+
+                    # bug? :the first frame/pattern pair is badly synced - I haven't figured it out..
+                    # it works by sleeping a bit:
+                    time.sleep(.1) 
+                    self.patterns.append(pattern)
                     # send flag to other threads here
                     self.download.set()
                     self.upload.clear()

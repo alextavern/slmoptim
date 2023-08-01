@@ -3,9 +3,10 @@ from .polling import Cam
 import numpy as np
 import threading
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK, TLCamera, Frame
+import matplotlib.pyplot as plt
+import time
 
-
-def get_interferogram(roi=(0, 0, 1440, 1080), bins=(1,1), num_of_frames=1, exposure_time=5000, gain=1, timeout=1000):
+def get_interferogram(roi=(0, 0, 1440, 1080), bins=(1,1), num_of_frames=1, exposure_time=5000, gain=1, timeout=10000):
     camera = Cam(roi, bins, num_of_frames, exposure_time, gain, timeout)
     frames = camera.get_frames()
     return frames
@@ -58,9 +59,9 @@ class CameraThread(threading.Thread):
         self.exposure_time = exposure_time
         self.timeout = timeout
         
+        self.upload = upload_pattern_event
         self.download = download_frame_event
         self.stop = stop_all_event
-        self.upload = upload_pattern_event
 
         self.frames = None
     
@@ -76,6 +77,7 @@ class CameraThread(threading.Thread):
             if len(available_cameras) < 1:
                 print("no cameras detected")
             # Configure the camera settings
+            print("Configuring and arming USB camera.")
 
             with sdk.open_camera(available_cameras[0]) as camera:
                 camera.exposure_time_us = self.exposure_time  # set exposure to 11 ms
@@ -93,10 +95,8 @@ class CameraThread(threading.Thread):
                     # print(camera.gain_range, camera.gain)
 
                 camera.arm(2)
-
                 camera.issue_software_trigger()
-                
-                print("USB camera configured and armed.")
+
 
                 download_thread = FrameAcquisitionThread(camera,
                                                          self.download, 
@@ -132,9 +132,9 @@ class FrameAcquisitionThread(threading.Thread):
         self.num_of_frames = num_of_frames
         self.camera = camera
 
+        self.upload = upload_pattern_event
         self.download = download_frame_event
         self.stop = stop_all_event
-        self.upload = upload_pattern_event
 
         self.frames = []
         
@@ -142,15 +142,13 @@ class FrameAcquisitionThread(threading.Thread):
         
         while not self.stop.is_set():
             self.download.wait()
+            # if self.download.is_set():
+            #     print("downloading frame now")
+            # Download the frame from the camera
+            frame = self.camera.get_pending_frame_or_null()
+            image_buffer_copy = np.copy(frame.image_buffer)
+            self.frames.append(image_buffer_copy)
             
-            # Download the frames from the camera
-            for i in range(self.num_of_frames):
-                frame = self.camera.get_pending_frame_or_null()
-                if frame is not None:
-                    image_buffer_copy = np.copy(frame.image_buffer)
-                    self.frames.append(image_buffer_copy)
-                else:
-                    print("timeout reached during polling, program exiting...")
-                    break
+            # set flags to threads
             self.download.clear()
             self.upload.set()

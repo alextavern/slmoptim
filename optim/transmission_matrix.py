@@ -4,8 +4,6 @@ from slmPy import slmpy
 import threading
 import numpy as np
 import pickle
-from scipy.linalg import hadamard
-import matplotlib.pyplot as plt
 
 """
 """
@@ -54,6 +52,13 @@ class TM:
         stop_all_event = threading.Event()
 
         # Create the threads
+        upload_thread = pt.SlmUploadPatternsThread(self.slm,
+                                            download_frame_event,
+                                            upload_pattern_event,
+                                            stop_all_event,
+                                            order=self.order,
+                                            mag=self.mag)
+        
         download_thread = cam.CameraThread(download_frame_event,
                                            upload_pattern_event,
                                            stop_all_event,
@@ -63,25 +68,20 @@ class TM:
                                            gain=self.gain,
                                            timeout=self.timeout)
 
-        upload_thread = pt.SlmUploadPatternsThread(self.slm,
-                                                   download_frame_event,
-                                                   upload_pattern_event,
-                                                   stop_all_event,
-                                                   order=self.order,
-                                                   mag=self.mag)
-
         # Start the threads
-        download_thread.start()
         upload_thread.start()
+        download_thread.start()
 
         # Wait for the threads to finish
         download_thread.join()
         upload_thread.join()
 
         # The main thread will wait for both threads to finish before continuing
-        print("Program execution completed.")
+        # Finally, close slm
         self.slm.close()
-        return self.download_thread.frames
+        print("Program execution completed.")
+        
+        return upload_thread.patterns, download_thread.frames
     
     def save_tm(self):
         filename = 'tm_raw_data_roi:{}_bins:{}_order:{}_mag:{}.pkl'.format([self.roi, self.bin, self.order, self.mag])
@@ -92,11 +92,9 @@ class TM:
 
 class calc_TM:
 
-    def __init__(self, data, bins=8, order=4, mag=4):
+    def __init__(self, data):
         self.data = data
-        self.bins = bins
-        self.order = order
-        self.mag = mag
+        
     
     @staticmethod
     def four_phases_method(intensities):
@@ -186,23 +184,13 @@ class calc_TM:
 
         return norm_ij
     
-    def calc_tm_norm(self):
-        tm_obs = self.calc_tm_obs()
-        norm = self.normalization_factor()
-        return tm_obs / norm
-    
-    def change2canonical(self):
-        h = hadamard(2 ** self.order)
-        h = pt.Pattern._enlarge_pattern(h, self.mag)
-        tm = np.dot(self.calc_tm_norm, h)
-        return tm
-    
     def plot_tm(self):
+        #INCOMPLETE#
         fig, axs = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, figsize=(5, 5))
-        axs[0, 0].imshow(abs(self.calc_tm_obs), aspect='auto')
-        axs[1, 0].imshow(self.normalization_factor, aspect='auto')
-        axs[0, 1].imshow(self.calc_tm_norm, aspect='auto')
-        axs[1, 1].imshow(self.calc_tm_can, aspect='auto')
+        axs[0, 0].imshow(abs(tm_obs), aspect='auto')
+        axs[1, 0].imshow(norm, aspect='auto')
+        axs[0, 1].imshow(tm_fil, aspect='auto')
+        axs[1, 1].imshow(tm, aspect='auto')
 
         axs[0, 0].set_title("Hadamard TM")
         axs[1, 0].set_title("Normalization")
