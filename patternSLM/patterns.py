@@ -247,10 +247,27 @@ class Pattern:
 
         return hadamard_vector, pattern.astype('uint8')
 
+    def add_subpattern(self, subpattern, gray=0):
+        # create a 2d array
+        rows = self.res_x
+        cols = self.res_y
+        # make sure that the image is composed by 8bit integers between 0 and 255
+        pattern = np.full(shape=(cols, rows), fill_value=gray).astype('uint8')
+        
+        # put it in the middle of the slm screen
+        # first calculate offsets from the image center
+        subpattern_dim = subpattern.shape
+        offset_x = int(rows / 2 - subpattern_dim[0] / 2)
+        offset_y = int(cols / 2 - subpattern_dim[1] / 2)
+        # and then add the vector in the center of the initialized pattern
+        pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = subpattern
+
+        return pattern.astype('uint8')
+        
     @staticmethod
     def _enlarge_pattern(matrix, n):
         """
-        it takes as input a 2d matrix and augments its dimensions by 2nx2n by conserving the same pattern
+        it takes as input a 2d matrix and augments its dimensions by 2^(n-1) by conserving the same pattern
         Parameters
         ----------
         matrix: input 2d array
@@ -308,9 +325,12 @@ class SlmUploadPatternsThread(threading.Thread):
         self.slm_patterns = Pattern(self.resX, self.resY, calib_px)
         self.basis = self.slm_patterns._get_hadamard_basis(self.order)
         
+        # the grayscale level that yields a pi phase modulation on the slm
         pi = int(calib_px / 2)
+        # for the 4-step phase shift interferometry
         self.four_phases = [0, pi / 2, pi, 3 * pi / 2]
-        self.four_phases = [0]
+        
+        # event triggers for syncing
         self.download = download_frame_event
         self.upload = upload_pattern_event
         self.stop = stop_all_event
@@ -321,25 +341,19 @@ class SlmUploadPatternsThread(threading.Thread):
 
             # loop through each 2d vector of the hadamard basis - basis is already generated here
             self.upload.set()
-            for vector in tqdm(self.basis):
+            for vector in tqdm(self.basis, desc='Hadamard vector pattern #:', leave=True):
                 # and for each vector load the four reference phases
-                for phase in tqdm(self.four_phases, leave=False):
+                for phase in self.four_phases:
                     _, pattern = self.slm_patterns.hadamard_pattern_bis(vector, n=self.mag, gray=phase)
                     self.upload.wait()
-                    # if self.upload.is_set():
-                    #     print("uploading pattern now")
                     self.slm.updateArray(pattern) # load each vector to slm
 
                     # bug? :the first frame/pattern pair is badly synced - I haven't figured it out..
-                    # it works by sleeping a bit:
+                    # it works by allowing it to sleep a bit:
                     time.sleep(.1) 
                     self.patterns.append(pattern)
                     # send flag to other threads here
                     self.download.set()
                     self.upload.clear()
-#                     if self.trigger_event.is_set():
-#                         print('download pattern')
-           
-#             if self.stop_event.is_set():
-#                 print('stop all')
+
             return  self.stop.set()

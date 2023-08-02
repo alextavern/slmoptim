@@ -185,18 +185,16 @@ if __name__ == "__main__":
 
             print("Setting camera parameters...")
             camera.frames_per_trigger_zero_for_unlimited = 0
-            
+            camera.roi = (0, 0, 1440, 1080)
             # middle_x = int(1440 / 2)
             # middle_y = int(1080 / 2)
-            # dim = 100
+            # dim = 49
             # roi = (middle_x - dim, middle_y - dim, middle_x + dim, middle_y + dim)
-            camera.roi = (0, 0, 1440, 1080)
             # camera.roi = roi
-            # camera.roi = (520 + 36, 440 + 36, 720 -36 - 1, 640 - 36 - 1)
-            # camera.roi=(975, 520, 980, 580)
-            # (camera.binx, camera.biny) = (8, 8)
-            # camera.exposure_time_us = 400
-            # (camera.binx, camera.biny) = (4, 4)
+            # camera.exposure_time_us = 400  # set exposure to 11 ms
+            # camera.image_poll_timeout_ms = 100  # 1 second polling timeout
+            # (camera.binx, camera.biny) = (1, 1)
+
             
             camera.arm(2)
             camera.issue_software_trigger()
