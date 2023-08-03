@@ -3,6 +3,7 @@ import numpy as np
 import scipy.fftpack as sfft
 from scipy import optimize
 from slmOptim.zeluxPy.helper_functions import get_interferogram
+import time
 
 def hist(array):
    counts, bins = np.histogram(array, bins=100)
@@ -27,8 +28,10 @@ def fit_gaussian(array, init_values=[1e9, 100, 20, 6.5e8]):
    y_data = array
    x_data = range(0,len(y_data))
    
-   params, params_covariance = optimize.curve_fit(gaussian_func, x_data, y_data,
-                                           p0=init_values)
+   params, _ = optimize.curve_fit(gaussian_func, x_data, y_data,
+                                           p0=init_values, 
+                                           bounds=((0, -np.inf, 0, -np.inf), 
+                                                   (np.inf, np.inf, np.inf, np.inf)))
    
    return params
 
@@ -40,17 +43,21 @@ def plot(data):
    axs[0, 0].imshow(data['speckle'])
    axs[0, 0].set_xlabel('x (px)')
    axs[0, 0].set_ylabel('y (px)')
+   axs[0, 0].set_title('Speckle pattern')
 
    # figure 2
    counts, bins = data['hist']
    axs[0, 1].hist(bins[:-1], bins, weights=counts)
    axs[0, 1].set_xlabel('intensity (a.u.)')
    axs[0, 1].set_ylabel('counts #')  
+   axs[0, 1].set_title('Histogram')
+
    # figure 3
    axs[1, 0].imshow(data['acf'])
    axs[1, 0].set_xlabel('x (px)')
    axs[1, 0].set_ylabel('y (px)')
-   
+   axs[1, 0].set_title('ACF')
+
    # figure 4
    y_data = data['acf'][100]
    x_data = range(0, len(y_data))
@@ -58,9 +65,11 @@ def plot(data):
    axs[1, 1].set_xlabel('x (px)')
    axs[1, 1].set_ylabel('intensity (a.u.)')
    axs[1, 1].legend(['raw', 'fit'])
-   axs[1, 1].set_title('grain size: {:0.2f}'.format(data['grain_size']))
+   axs[1, 1].set_title('grain size: {:0.2f} px'.format(data['grain_size']))
    fig.tight_layout()
-   fig.savefig("speckle_grain.png", dpi=400, transparent=False)
+   
+   timestr = time.strftime("%Y%m%d-%H%M")
+   fig.savefig("{}_speckle_grain.png".format(timestr), dpi=400, transparent=False)
    return fig
    
 

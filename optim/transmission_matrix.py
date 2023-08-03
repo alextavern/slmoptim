@@ -1,4 +1,5 @@
 from ..patternSLM import patterns as pt
+from ..patternSLM import upload as up
 from ..zeluxPy import helper_functions as cam
 from slmPy import slmpy
 from scipy.linalg import hadamard
@@ -6,11 +7,13 @@ import threading
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
+import time
+
 """
 """
 
 
-class meas_TM:
+class measTM:
 
     def __init__(self, roi=(556, 476, 684 - 1, 604 - 1), bins=8, exposure_time=100, gain=1, timeout=100,
                  order=4, mag=5,
@@ -53,7 +56,7 @@ class meas_TM:
         stop_all_event = threading.Event()
 
         # Create the threads
-        upload_thread = pt.SlmUploadPatternsThread(self.slm,
+        upload_thread = up.SlmUploadPatternsThread(self.slm,
                                             download_frame_event,
                                             upload_pattern_event,
                                             stop_all_event,
@@ -82,16 +85,24 @@ class meas_TM:
         self.slm.close()
         print("Program execution completed.")
         
-        return upload_thread.patterns, download_thread.frames
+        # save uploaded 
+        self.patterns = upload_thread.patterns
+        self.frames = download_thread.frames
+        return self.patterns, self.frames
     
     def save_tm(self):
-        filename = 'tm_raw_data_roi:{}_bins:{}_order:{}_mag:{}.pkl'.format([self.roi, self.bins, self.order, self.mag])
+        timestr = time.strftime("%Y%m%d-%H%M")
+        filename = '{}_tm_raw_data_ROI{}_Bins{}_Order{}_Mag{}.pkl'.format(timestr, 
+                                                                              self.roi, 
+                                                                              self.bins, 
+                                                                              self.order, 
+                                                                              self.mag)
         with open(filename, 'wb') as fp:
-            pickle.dump(self.download_thread.frames, fp)
+            pickle.dump(self.frames, fp)
         return
         
 
-class calc_TM:
+class calcTM:
 
     def __init__(self, data):
         self.data = data
@@ -185,8 +196,9 @@ class calc_TM:
 
         return norm_ij
     
-    @staticmethod
-    def _change2canonical(matrix, order=8, mag=3):
+    def _change2canonical(self, matrix, order=8, mag=3):
+        _, _, slm_px_len, _ = self._calc_tm_dim()
+        order = slm_px_len ** 0.5
         h = hadamard(2 ** order)
         # h = pt.Pattern._enlarge_pattern(h, mag)
         tm = np.dot(matrix, h)
@@ -194,17 +206,17 @@ class calc_TM:
 
     def calc_plot_tm(self):
         
-        tm_obs = abs(self._calc_tm_obs())
+        tm_obs = self._calc_tm_obs()
         norm = self._normalization_factor()
-        tm_fil = abs(tm_obs / norm)
+        tm_fil = tm_obs / norm
         tm = self._change2canonical(tm_fil)
         
         
         fig, axs = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, figsize=(7, 7))
         axs[0, 0].imshow(abs(tm_obs), aspect='auto')
         axs[1, 0].imshow(norm, aspect='auto')
-        axs[0, 1].imshow(tm_fil, aspect='auto')
-        axs[1, 1].imshow(tm, aspect='auto')
+        axs[0, 1].imshow(abs(tm_fil), aspect='auto')
+        axs[1, 1].imshow(abs(tm), aspect='auto')
 
         axs[0, 0].set_title("Hadamard TM")
         axs[1, 0].set_title("Normalization")
@@ -217,35 +229,3 @@ class calc_TM:
         
         return tm_obs, norm, tm_fil, tm
         
-class InverseLight:
-    
-    def __init__(self, target) -> None:
-        pass
-    
-    
-    def _conj_trans(matrix):
-        return  matrix.transpose().conjugate()
-    
-    def _inverse_prop(target):
-        # first flatten
-        target_frame_flattened = []
-        for iy, ix in np.ndindex(frame_shape):
-            target_frame_flattened.append(target_frame[iy, ix])
-
-        target_frame_flattened = np.array(target_frame_flattened)
-
-        # apply inversion
-        inverse = np.dot(tm_T_star, target_frame_flattened.T)
-
-        # get phase
-        arg = np.angle(inverse, deg=False)
-        arg2pi = (arg + 2 * np.pi) % (2 * np.pi)
-        arg2SLM = arg2pi * 112 / (2 * np.pi) 
-
-        # and unflatten again
-        phase_mask = np.full(shape=(16, 16), fill_value=0).astype('float64')
-        for idx, ij in enumerate(np.ndindex(16, 16)):
-            phase_mask[ij[0], ij[1]] = arg2SLM[idx]
-            
-        # enlarge for the SLM macropixels
-        phase_mask_enlarged = _enlarge_pattern(phase_mask, 4)

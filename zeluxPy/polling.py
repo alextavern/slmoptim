@@ -49,6 +49,7 @@ class Cam:
                 camera.roi = self.roi
                 # set binning for macropixels
                 (camera.binx, camera.biny) = self.bins
+                # print(camera.roi)
 
                 if camera.gain_range.max > 0:
                     db_gain = self.gain

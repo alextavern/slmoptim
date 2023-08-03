@@ -1,10 +1,4 @@
-import matplotlib.pyplot as plt
-import numpy as np
 from slmOptim.optim import transmission_matrix
-from slmOptim.zeluxPy import helper_functions as cam
-from slmOptim.patternSLM import patterns as pt
-from slmPy import slmpy
-
 
 # some parameters
 order = 4
@@ -15,18 +9,24 @@ middle_y = int(1080 / 2)
 dim = 100
 roi = (middle_x - dim, middle_y - dim, middle_x + dim, middle_y + dim)
 
-speckele_grain = 4
-bins = speckele_grain
+bins = 4
 
 exposure_time = 400
 gain = 1
 timeout= 100 # timeout
 
+# measure tm
+tm_raw = transmission_matrix.measTM(roi=roi, 
+                            bins=bins, 
+                            exposure_time=exposure_time, 
+                            order=order, 
+                            mag=mag)
 
-# tm = transmission_matrix.TM(roi=roi, 
-#                             bins=bins, 
-#                             exposure_time=exposure_time, 
-#                             order=order, 
-#                             mag=mag)
+patterns, frames = tm_raw.get_tm()
+tm_raw.save_tm()
 
-# tm_raw = tm.get_tm()
+# calculate tm
+tr = transmission_matrix.calcTM(frames)
+_, _, _, tm = tr.calc_plot_tm()
+
+# inverse

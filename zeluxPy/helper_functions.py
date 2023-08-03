@@ -2,9 +2,7 @@ from scipy import ndimage
 from .polling import Cam
 import numpy as np
 import threading
-from thorlabs_tsi_sdk.tl_camera import TLCameraSDK, TLCamera, Frame
-import matplotlib.pyplot as plt
-import time
+from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
 def get_interferogram(roi=(0, 0, 1440, 1080), bins=(1,1), num_of_frames=1, exposure_time=5000, gain=1, timeout=10000):
     camera = Cam(roi, bins, num_of_frames, exposure_time, gain, timeout)
@@ -77,7 +75,7 @@ class CameraThread(threading.Thread):
             if len(available_cameras) < 1:
                 print("no cameras detected")
             # Configure the camera settings
-            print("Configuring and arming USB camera.")
+            print("USB camera configured, armed and triggered.")
 
             with sdk.open_camera(available_cameras[0]) as camera:
                 camera.exposure_time_us = self.exposure_time  # set exposure to 11 ms
