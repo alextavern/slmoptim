@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 from scipy import signal
 from scipy.linalg import hadamard
 
@@ -291,4 +292,14 @@ class Pattern:
             matrix = np.dstack((matrix, matrix)).flatten().reshape(new_dim, new_dim)
 
         return matrix
+    
+    def correct_aberrations(self, correction, pattern, alpha=0.5):
+
+        
+        # blend images
+        beta = (1.0 - alpha)
+        pattern = cv2.addWeighted(pattern, alpha, correction, beta, 0.0)
+        # pattern = pattern + corr_patt2
+        
+        return pattern.astype('uint8')
     

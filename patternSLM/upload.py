@@ -1,11 +1,12 @@
 import threading
 from .patterns import Pattern
 from tqdm.auto import tqdm
-import time
+import numpy as np
+import time, cv2
 
 class SlmUploadPatternsThread(threading.Thread):
     
-    def __init__(self, slm, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, order=4, mag=5):
+    def __init__(self, slm, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, order=4, mag=5, path=None):
         """ This thread is designed to run in paraller with another thread that download frames from a camera. In particular
         this class uploads a hadamard vector on the SLM, sets a thread event that triggers the other thread to download a frame. 
         Then, it waits for a thread event to be set from the camera thread to upload the next hadamard vector. 
@@ -40,6 +41,14 @@ class SlmUploadPatternsThread(threading.Thread):
         self.slm_patterns = Pattern(self.resX, self.resY, calib_px)
         self.basis = self.slm_patterns._get_hadamard_basis(self.order)
         
+        self.path = path
+        if self.path is not None:
+            correction =  cv2.imread(path) # load correction image
+            r, _, _ = cv2.split(correction) # split rgb channels
+            
+            z = np.zeros((self.resY, 8)).astype('uint8') # corrected image lacks 8 columns
+            self.correction = np.append(r, z, axis=1) # we add zeros
+        
         # the grayscale level that yields a pi phase modulation on the slm
         pi = int(calib_px / 2)
         # for the 4-step phase shift interferometry
@@ -60,6 +69,8 @@ class SlmUploadPatternsThread(threading.Thread):
                 # and for each vector load the four reference phases
                 for phase in self.four_phases:
                     _, pattern = self.slm_patterns.hadamard_pattern_bis(vector, n=self.mag, gray=phase)
+                    if self.path is not None:
+                        pattern = self.slm_patterns.correct_aberrations(self.correction, pattern, alpha=.5)
                     self.upload.wait()
                     self.slm.updateArray(pattern) # load each vector to slm
 
