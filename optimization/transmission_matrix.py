@@ -106,7 +106,7 @@ class measTM:
                                                                           self.order, 
                                                                           self.mag)
         with open(filename, 'wb') as fp:
-            pickle.dump(self.frames, fp)
+            pickle.dump((self.patterns, self.frames), fp)
         
 
 class calcTM:
@@ -244,10 +244,10 @@ class Target:
     def __init__(self, shape) -> None:
         self.shape = shape
         
-    def square(self, focus_shape):
+    def square(self, focus_shape, intensity=1000):
         # create a focus point
         target_frame = np.full(shape=self.shape, fill_value=0).astype('float64')
-        target_focus = np.full(shape=focus_shape, fill_value=1).astype('float64')
+        target_focus = np.full(shape=focus_shape, fill_value=intensity).astype('float64')
 
         # put it in the middle of the slm screen
         # first calculate offsets from the image center

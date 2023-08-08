@@ -3,20 +3,21 @@ import numpy as np
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
 
-def get_interferogram(roi=(0, 0, 1440, 1080), bins=(1,1), num_of_frames=1, exposure_time=5000, gain=1, timeout=10000):
-    camera = Cam(roi, bins, num_of_frames, exposure_time, gain, timeout)
+def get_interferogram(roi=(0, 0, 1440, 1080), bins=(1,1), num_of_frames=1, exposure_time=5000, gain=1, timeout=10000, return_roi=True):
+    camera = Cam(roi, bins, num_of_frames, exposure_time, gain, timeout, return_roi)
     frames = camera.get_frames()
     return frames
 
 
-def get_frame_binned(roi, bins, num_of_frames=1, exposure_time=5000, gain=1, timeout=1000):
+def get_frame_binned(roi, bins, num_of_frames=1, exposure_time=5000, gain=1, timeout=1000, return_roi=True):
 
     frame = get_interferogram(roi=roi,
                               bins=(bins, bins),
                               num_of_frames=num_of_frames,
                               exposure_time=exposure_time,
                               gain=gain,
-                              timeout=timeout)
+                              timeout=timeout, 
+                              return_roi=return_roi)
 
     return frame
 
@@ -27,13 +28,20 @@ def rotate_frame(frame, angle):
 
 class Cam:
 
-    def __init__(self, roi=(0, 0, 1440, 1080), bins=(1, 1), num_of_frames=10, exposure_time=11000, gain=6, timeout=1000):
+    def __init__(self, roi=(0, 0, 1440, 1080), 
+                 bins=(1, 1), 
+                 num_of_frames=10, 
+                 exposure_time=11000, 
+                 gain=6, 
+                 timeout=1000, 
+                 return_roi=False):
         self.roi = roi
         self.bins = bins
         self.num_of_frames = num_of_frames
         self.gain = float(gain)
         self.exposure_time = exposure_time
         self.timeout = timeout
+        self.return_roi = return_roi
 
         try:
             # if on Windows, use the provided setup script to add the DLLs folder to the PATH
@@ -66,6 +74,8 @@ class Cam:
                     # print(f"Gain: {camera.convert_gain_to_decibels(camera.gain)}")
                     # print(camera.gain_range, camera.gain)
 
+                if self.return_roi:
+                    print("The real camera ROI is: {}".format(camera.roi))
                 camera.arm(2)
 
                 camera.issue_software_trigger()

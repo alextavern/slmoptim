@@ -186,6 +186,7 @@ if __name__ == "__main__":
             print("Setting camera parameters...")
             camera.frames_per_trigger_zero_for_unlimited = 0
             camera.roi = (0, 0, 1440, 1080)
+            camera.exposure_time_us = 2000
             # middle_x = int(1440 / 2)
             # middle_y = int(1080 / 2)
             # dim = 49
