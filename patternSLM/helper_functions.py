@@ -15,6 +15,7 @@ def check(ij, order, mag, roi, bins, exposure_time, gain, timeout):
 
     slm.updateArray(pattern)
     frame = cam.get_frame_binned(roi, bins, gain, exposure_time, gain, timeout)
+    frame = cam.normalize_frame(frame[1])
 
     fig, axs = plt.subplots(1, 2)
     axs[0].imshow(pattern)
@@ -22,7 +23,7 @@ def check(ij, order, mag, roi, bins, exposure_time, gain, timeout):
     axs[0].set_xlabel('SLM y pixels #')
     axs[0].set_title('SLM pattern ')
 
-    fr = axs[1].imshow(frame[1])
+    fr = axs[1].imshow(frame)
     divider = make_axes_locatable(axs[1])
     cax = divider.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(fr, cax=cax)
@@ -36,9 +37,10 @@ def check(ij, order, mag, roi, bins, exposure_time, gain, timeout):
 
 def plot_focus(pattern, frame):
 
+    
     fig, axs = plt.subplots(1, 2, figsize=(10, 10))
+
     mask = axs[0].imshow(pattern, aspect=1)
-    # fig.colorbar(mask, ax=axs[0])
     divider = make_axes_locatable(axs[0])
     cax = divider.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(mask, cax=cax)

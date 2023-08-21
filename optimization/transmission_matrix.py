@@ -220,7 +220,6 @@ class calcTM:
         tm_fil = tm_obs / norm
         tm = self._had2canonical(tm_fil)
         
-        
         fig, axs = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, figsize=(7, 7))
         axs[0, 0].imshow(abs(tm_obs), aspect='auto')
         axs[1, 0].imshow(norm, aspect='auto')
@@ -232,8 +231,8 @@ class calcTM:
         axs[0, 1].set_title("Filtered TM")
         axs[1, 1].set_title("Canonical TM")
 
-        fig.text(0.5, -0.01, 'camera pixels #', ha='center')
-        fig.text(-0.01, 0.5, 'slm pixels #', va='center', rotation='vertical')
+        fig.text(0.5, -0.01, 'slm pixels #', ha='center')
+        fig.text(-0.01, 0.5, 'camera pixels #', va='center', rotation='vertical')
         fig.tight_layout()
         
         return tm_obs, norm, tm_fil, tm
@@ -244,7 +243,7 @@ class Target:
     def __init__(self, shape) -> None:
         self.shape = shape
         
-    def square(self, focus_shape, intensity=1000):
+    def square(self, focus_shape, offset_x=0, offset_y=0, intensity=1000):
         # create a focus point
         target_frame = np.full(shape=self.shape, fill_value=0).astype('float64')
         target_focus = np.full(shape=focus_shape, fill_value=intensity).astype('float64')
@@ -252,11 +251,11 @@ class Target:
         # put it in the middle of the slm screen
         # first calculate offsets from the image center
         subpattern_dim = target_focus.shape
-        offset_x = int(self.shape[1] / 2 - subpattern_dim[0] / 2)
-        offset_y = int(self.shape[1] / 2 - subpattern_dim[1] / 2)
+        center_x = int(self.shape[1] / 2 - subpattern_dim[0] / 2) + offset_x
+        center_y = int(self.shape[1] / 2 - subpattern_dim[1] / 2) + offset_y
 
         # and then add the vector in the center of the initialized pattern
-        target_frame[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = target_focus
+        target_frame[center_y:center_y + subpattern_dim[0], center_x:center_x + subpattern_dim[1]] = target_focus
         
         return target_frame
 
@@ -324,4 +323,3 @@ class InverseLight:
         
         return self.phase_mask_enlarged
     
-        

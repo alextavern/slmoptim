@@ -26,6 +26,10 @@ def rotate_frame(frame, angle):
     return frame_rot
 
 
+def normalize_frame(frame):
+    frame_norm = (frame - np.min(frame)) / (np.max(frame) - np.min(frame))
+    return frame_norm
+
 class Cam:
 
     def __init__(self, roi=(0, 0, 1440, 1080), 
