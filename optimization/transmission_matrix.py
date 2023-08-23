@@ -9,6 +9,7 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 import time
+import os
 
 """
 """
@@ -18,7 +19,9 @@ class measTM:
 
     def __init__(self, roi=(556, 476, 684 - 1, 604 - 1), bins=8, exposure_time=100, gain=1, timeout=100,
                  order=4, mag=5,
-                 monitor=1, path=None):
+                 monitor=1, 
+                 corr_path=None,
+                 save_path=None):
         """
 
         Parameters
@@ -45,9 +48,12 @@ class measTM:
         self.mag = mag
         
         # correction pattern
-        self.path = path
+        self.corr_path = corr_path
         # slm monitor setting
         self.slm = slmpy.SLMdisplay(monitor=monitor)
+
+        # save raw data path
+        self.save_path = save_path
         
     def get_tm(self):
         """
@@ -68,7 +74,7 @@ class measTM:
                                             stop_all_event,
                                             order=self.order,
                                             mag=self.mag,
-                                            path=self.path)
+                                            path=self.corr_path)
         
         download_thread = cam.CameraThread(download_frame_event,
                                            upload_pattern_event,
@@ -98,13 +104,15 @@ class measTM:
         return self.patterns, self.frames
     
     def save_tm(self):
-        
+
         timestr = time.strftime("%Y%m%d-%H%M")
         filename = '{}_tm_raw_data_ROI{}_Bins{}_Order{}_Mag{}.pkl'.format(timestr, 
                                                                           self.roi, 
                                                                           self.bins, 
                                                                           self.order, 
                                                                           self.mag)
+        os.path.join(self.save_path, filename)
+
         with open(filename, 'wb') as fp:
             pickle.dump((self.patterns, self.frames), fp)
         
