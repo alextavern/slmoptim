@@ -4,7 +4,7 @@ from ..zeluxPy import helper_functions as cam
 import matplotlib.pyplot as plt
 from ..patternSLM import patterns as  pt
 
-def check(ij, order, mag, roi, bins, exposure_time, gain, timeout):
+def check(ij, order, mag, roi, bins, exposure_time, gain, timeout, norm=True):
 # do some checks
 
     slm = slmpy.SLMdisplay(monitor=1)
@@ -15,7 +15,8 @@ def check(ij, order, mag, roi, bins, exposure_time, gain, timeout):
 
     slm.updateArray(pattern)
     frame = cam.get_frame_binned(roi, bins, gain, exposure_time, gain, timeout)
-    frame = cam.normalize_frame(frame[1])
+    if norm:
+        frame = cam.normalize_frame(frame[1])
 
     fig, axs = plt.subplots(1, 2)
     axs[0].imshow(pattern)
@@ -49,3 +50,5 @@ def plot_focus(pattern, frame):
     divider = make_axes_locatable(axs[1])
     cax = divider.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(fo, cax=cax)
+    
+    return fig

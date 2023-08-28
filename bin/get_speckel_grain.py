@@ -3,7 +3,7 @@ import numpy as np
 import scipy.fftpack as sfft
 from scipy import optimize
 from slmOptim.zeluxPy.helper_functions import get_interferogram
-import time
+import time, os
 
 def hist(array):
    counts, bins = np.histogram(array, bins=100)
@@ -69,19 +69,22 @@ def plot(data):
    fig.tight_layout()
    
    timestr = time.strftime("%Y%m%d-%H%M")
-   fig.savefig("{}_speckle_grain.png".format(timestr), dpi=400, transparent=False)
+   filename = '{}_speckle_grain.png'.format(timestr)
+
+   fig.savefig(filename, dpi=400, transparent=False)
    return fig
    
 
 
 if __name__ == "__main__":
    
+   # dict to save data
    data_out = {}
-   
+
    # get speckle pattern
    speckle = get_interferogram(roi=(620, 440, 820, 640),
                            num_of_frames=1,
-                           exposure_time=1000, 
+                           exposure_time=300, 
                            gain=5, 
                            timeout=100)
    

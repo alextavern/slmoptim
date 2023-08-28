@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 from scipy import signal
 from scipy.linalg import hadamard
+import random
 
 """
 A class that creates various patterns to be uploaded to an SLM:
@@ -252,8 +253,31 @@ class Pattern:
         pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = hadamard_vector
 
         return hadamard_vector, pattern.astype('uint8')
+    
+    def random(self, dim):
+        """_summary_
+
+        Args:
+            dim (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        phase_list = np.arange(0, 2 * self.grayphase + 1, self.grayphase / 4)
+        pattern = np.array([[random.choice(phase_list) for i in range(dim)] for j in range(dim)])
+        return pattern.astype('uint8')
+
 
     def add_subpattern(self, subpattern, gray=0):
+        """_summary_
+
+        Args:
+            subpattern (_type_): _description_
+            gray (int, optional): _description_. Defaults to 0.
+
+        Returns:
+            _type_: _description_
+        """
         # create a 2d array
         rows = self.res_x
         cols = self.res_y

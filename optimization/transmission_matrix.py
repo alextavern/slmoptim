@@ -111,9 +111,13 @@ class measTM:
                                                                           self.bins, 
                                                                           self.order, 
                                                                           self.mag)
-        os.path.join(self.save_path, filename)
+        
+        if self.save_path:
+            filepath = os.path.join(self.save_path, filename)
+        else:
+            filepath=filename
 
-        with open(filename, 'wb') as fp:
+        with open(filepath, 'wb') as fp:
             pickle.dump((self.patterns, self.frames), fp)
         
 
