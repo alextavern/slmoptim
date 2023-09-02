@@ -6,7 +6,7 @@ import time, cv2
 
 class SlmUploadPatternsThread(threading.Thread):
     
-    def __init__(self, slm, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, order=4, mag=5, path=None):
+    def __init__(self, slm, start_all_event, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, order=4, mag=5, path=None):
         """ This thread is designed to run in paraller with another thread that download frames from a camera. In particular
         this class uploads a hadamard vector on the SLM, sets a thread event that triggers the other thread to download a frame. 
         Then, it waits for a thread event to be set from the camera thread to upload the next hadamard vector. 
@@ -55,14 +55,17 @@ class SlmUploadPatternsThread(threading.Thread):
         self.four_phases = [0, pi / 2, pi, 3 * pi / 2]
         
         # event triggers for syncing
+        self.start = start_all_event
         self.download = download_frame_event
         self.upload = upload_pattern_event
         self.stop = stop_all_event
 
         self.patterns = []
         
+        
     def run(self):
-
+        
+        while self.start.is_set():
             # loop through each 2d vector of the hadamard basis - basis is already generated here
             self.upload.set()
             for vector in tqdm(self.basis, desc='Uploading Hadamard patterns', leave=True):
@@ -82,5 +85,5 @@ class SlmUploadPatternsThread(threading.Thread):
                     self.download.set()
                     self.upload.clear()
 
-            return  self.stop.set()
+        return  self.stop.set()
         

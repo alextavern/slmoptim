@@ -89,7 +89,7 @@ class CameraThread(threading.Thread):
 
 class FrameAcquisitionThread(threading.Thread):
     
-    def __init__(self, camera, download_frame_event, upload_pattern_event, stop_all_event, num_of_frames=1):
+    def __init__(self, camera, download_frame_event, upload_pattern_event, stop_all_event):
         """ 
         This is a thread that once a zelux camera is configured, armed and triggered, downloads one (or more) frame from
         the camera. The associated thread events syncronises this thread with the parallel ones. 
@@ -104,7 +104,6 @@ class FrameAcquisitionThread(threading.Thread):
         """
         super(FrameAcquisitionThread, self).__init__()
 
-        self.num_of_frames = num_of_frames
         self.camera = camera
 
         self.upload = upload_pattern_event
