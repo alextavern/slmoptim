@@ -2,6 +2,9 @@ from ..patternSLM import patterns as pt
 from ..patternSLM import upload as up
 from ..zeluxPy import download as cam
 
+from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
+
+
 from slmPy import slmpy
 from scipy.linalg import hadamard
 import threading
@@ -43,6 +46,10 @@ class measTM:
         self.gain = gain
         self.timeout = timeout
         
+        # init camera
+        self.init_camera = cam.InitCamera(roi, bins, exposure_time, gain, timeout)
+        self.camera = self.init_camera.config()
+        
         # hadamard settings
         self.order = order
         self.mag = mag
@@ -55,13 +62,14 @@ class measTM:
         # save raw data path
         self.save_path = save_path
         
-    def get_tm(self):
+    def get(self):
         """
 
         Returns
         -------
 
         """
+        
         # Create flag events
         download_frame_event = threading.Event()
         upload_pattern_event = threading.Event()
@@ -75,15 +83,12 @@ class measTM:
                                             order=self.order,
                                             mag=self.mag,
                                             path=self.corr_path)
-        
-        download_thread = cam.CameraThread(download_frame_event,
-                                           upload_pattern_event,
-                                           stop_all_event,
-                                           roi=self.roi,
-                                           bins=(self.bins, self.bins),
-                                           exposure_time=self.exposure_time,
-                                           gain=self.gain,
-                                           timeout=self.timeout)
+
+        download_thread = cam.FrameAcquisitionThread(self.camera,
+                                                     download_frame_event, 
+                                                     upload_pattern_event, 
+                                                     stop_all_event,
+                                                    num_of_frames=1)
 
         # Start the threads
         upload_thread.start()
@@ -94,16 +99,18 @@ class measTM:
         upload_thread.join()
 
         # The main thread will wait for both threads to finish before continuing
-        # Finally, close slm
+        
+        # Finally, kill all
         self.slm.close()
+        self.init_camera.destroy()
         print("Program execution completed.")
         
-        # save uploaded 
+        # get and return data 
         self.patterns = upload_thread.patterns
         self.frames = download_thread.frames
         return self.patterns, self.frames
     
-    def save_tm(self):
+    def save(self):
 
         timestr = time.strftime("%Y%m%d-%H%M")
         filename = '{}_tm_raw_data_ROI{}_Bins{}_Order{}_Mag{}.pkl'.format(timestr, 
