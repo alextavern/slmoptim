@@ -1,9 +1,91 @@
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
-
 import threading
 import numpy as np
 
+class InitCamera():
+    def __init__(self, roi, bins, exposure_time, gain, timeout):    
+        # camera settings
+        self.roi = roi
+        self.bins = bins
+        self.exposure_time = exposure_time
+        self.gain = gain
+        self.timeout = timeout
+    
+    def config(self):
+        # camera instance
+        self.sdk = TLCameraSDK()
+        available_cameras = self.sdk.discover_available_cameras()
+        self.camera = self.sdk.open_camera(available_cameras[0])
 
+        # configure
+        self.camera.exposure_time_us = self.exposure_time  # set exposure to 11 ms
+        self.camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode
+        self.camera.image_poll_timeout_ms = self.timeout  # 1 second polling timeout
+        self.camera.roi = self.roi
+        # set binning for macropixels
+        (self.camera.binx, self.camera.biny) = (self.bins, self.bins)
+
+        if self.camera.gain_range.max > self.gain:
+            db_gain = self.gain
+            gain_index = self.camera.convert_decibels_to_gain(db_gain)
+            self.camera.gain = gain_index
+
+        # arm - trigger
+        self.camera.arm(2)
+        self.camera.issue_software_trigger()
+        
+        return self.camera
+    
+    def destroy(self):
+        self.camera.disarm()
+        self.camera.dispose()
+        self.sdk.dispose()
+        
+        
+class FrameAcquisitionThread(threading.Thread):
+    
+    def __init__(self, camera, download_frame_event, upload_pattern_event, stop_all_event, num_of_frames=1):
+        """ 
+        This is a thread that once a zelux camera is configured, armed and triggered, downloads one (or more) frame from
+        the camera. The associated thread events syncronises this thread with the parallel ones. 
+        Parameters
+        ----------
+        camera : class object
+            zelux thorlabs SDK
+        download_frame_event : thread event
+        upload_pattern_event : thread event
+        stop_all_event : thread event
+        num_of_frames : int, optional
+        """
+        super(FrameAcquisitionThread, self).__init__()
+
+        self.num_of_frames = num_of_frames
+        self.camera = camera
+
+        self.upload = upload_pattern_event
+        self.download = download_frame_event
+        self.stop = stop_all_event
+
+        self.frames = []
+        
+    def run(self):
+        
+        while not self.stop.is_set():
+            self.download.wait()
+            # if self.download.is_set():
+            #     print("downloading frame now")
+            # Download the frame from the camera
+            frame = self.camera.get_pending_frame_or_null()
+            image_buffer_copy = np.copy(frame.image_buffer)
+            self.frames.append(image_buffer_copy)
+            
+            # set flags to threads
+            self.download.clear()
+            self.upload.set()
+            
+            
 class CameraThread(threading.Thread):
 
     def __init__(self, download_frame_event, upload_pattern_event, stop_all_event, roi=(0, 0, 1440, 1080), bins=(1, 1), exposure_time=11000, gain=6, timeout=1000):
@@ -87,43 +169,4 @@ class CameraThread(threading.Thread):
                 self.frames = download_thread.frames
 
 
-class FrameAcquisitionThread(threading.Thread):
-    
-    def __init__(self, camera, download_frame_event, upload_pattern_event, stop_all_event, num_of_frames=1):
-        """ 
-        This is a thread that once a zelux camera is configured, armed and triggered, downloads one (or more) frame from
-        the camera. The associated thread events syncronises this thread with the parallel ones. 
-        Parameters
-        ----------
-        camera : class object
-            zelux thorlabs SDK
-        download_frame_event : thread event
-        upload_pattern_event : thread event
-        stop_all_event : thread event
-        num_of_frames : int, optional
-        """
-        super(FrameAcquisitionThread, self).__init__()
 
-        self.num_of_frames = num_of_frames
-        self.camera = camera
-
-        self.upload = upload_pattern_event
-        self.download = download_frame_event
-        self.stop = stop_all_event
-
-        self.frames = []
-        
-    def run(self):
-        
-        while not self.stop.is_set():
-            self.download.wait()
-            # if self.download.is_set():
-            #     print("downloading frame now")
-            # Download the frame from the camera
-            frame = self.camera.get_pending_frame_or_null()
-            image_buffer_copy = np.copy(frame.image_buffer)
-            self.frames.append(image_buffer_copy)
-            
-            # set flags to threads
-            self.download.clear()
-            self.upload.set()
