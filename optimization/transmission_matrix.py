@@ -1,13 +1,10 @@
 from ..patternSLM import patterns as pt
 from ..patternSLM import upload as up
 from ..zeluxPy import download as cam
-
-from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
-
-
 from slmPy import slmpy
 from scipy.linalg import hadamard
 import threading
+from tqdm.auto import tqdm
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
@@ -22,7 +19,8 @@ class measTM:
 
     def __init__(self, roi=(556, 476, 684 - 1, 604 - 1), bins=8, exposure_time=100, gain=1, timeout=100,
                  order=4, mag=5,
-                 monitor=1, 
+                 monitor=1,
+                 calib_px=112,
                  corr_path=None,
                  save_path=None):
         """
@@ -46,7 +44,7 @@ class measTM:
         self.gain = gain
         self.timeout = timeout
         
-        # init camera
+        # initiliaze camera
         self.init_camera = cam.InitCamera(roi, bins, exposure_time, gain, timeout)
         self.camera = self.init_camera.config()
         
@@ -56,18 +54,21 @@ class measTM:
         
         # correction pattern
         self.corr_path = corr_path
-        # slm monitor setting
+        
+        # initialize slm
         self.slm = slmpy.SLMdisplay(monitor=monitor)
+        self.calib_px = calib_px
 
         # save raw data path
         self.save_path = save_path
         
     def get(self):
-        """
+        """_summary_
 
         Returns
         -------
-
+        _type_
+            _description_
         """
         
         # Create flag events
@@ -80,6 +81,7 @@ class measTM:
                                             download_frame_event,
                                             upload_pattern_event,
                                             stop_all_event,
+                                            calib_px = self.calib_px,
                                             order=self.order,
                                             mag=self.mag,
                                             path=self.corr_path)
@@ -88,7 +90,7 @@ class measTM:
                                                      download_frame_event, 
                                                      upload_pattern_event, 
                                                      stop_all_event,
-                                                    num_of_frames=1)
+                                                     num_of_frames=1)
 
         # Start the threads
         upload_thread.start()
@@ -103,13 +105,65 @@ class measTM:
         # Finally, kill all
         self.slm.close()
         self.init_camera.destroy()
-        print("Program execution completed.")
+        print("Program execution completed - camera and slm killed! ")
         
         # get and return data 
         self.patterns = upload_thread.patterns
         self.frames = download_thread.frames
+        
         return self.patterns, self.frames
     
+    def get2(self, slm_delay=0.1):
+        """_summary_
+
+        Parameters
+        ----------
+        slm_delay : float, optional
+            _description_, by default 0.1
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        basis = pt.Pattern._get_hadamard_basis(self.order)
+        pi = int(self.calib_px / 2)
+        four_phases = [0, pi / 2, pi, 3 * pi / 2]
+        
+        # four_intensities = {}
+        self.patterns = []
+        self.frames = []
+        
+        resX, resY = self.slm.getSize()
+        slm_patterns = pt.Pattern(resX, resY)
+
+
+        # loop through each 2d vector of the hadamard basis - 
+        # basis is already generated here
+        for vector in tqdm(basis, desc='Uploading Hadamard patterns', leave=True):
+            # and for each vector load the four reference phases
+            for phase in four_phases:
+                _, pattern = slm_patterns.hadamard_pattern_bis(vector, n=self.mag, gray=phase)
+                self.slm.updateArray(pattern) # load each vector to slm
+                time.sleep(slm_delay)
+                # get frame for each phase
+                frame = self.camera.get_pending_frame_or_null()
+                image_buffer_copy = np.copy(frame.image_buffer)
+
+                # four_intensities[idx, phase] = image_buffer_copy
+                self.patterns.append(pattern)
+                self.frames.append(image_buffer_copy)
+                
+        # Finally, kill all
+        self.slm.close()
+        self.init_camera.destroy()
+        print("Program execution completed - camera and slm killed! ")
+        # data = []
+        # for item in four_intensities.items():
+        #     data.append(item[1])
+            
+        return self.patterns, self.frames
+        
     def save(self):
 
         timestr = time.strftime("%Y%m%d-%H%M")
@@ -143,7 +197,7 @@ class calcTM:
         complex_field = complex((I1 - I4) / 4, (I3 - I2) / 4)
         return complex_field
     
-    def _calc_tm_dim(self):
+    def _calc_dim(self):
         shape = np.array(self.data).shape
         
         total_num = shape[0]
@@ -153,7 +207,7 @@ class calcTM:
         
         return total_num, frame_shape, slm_px_len, cam_px_len
 
-    def _calc_tm_obs(self):
+    def _calc_obs(self):
         """_summary_
 
         Returns:
@@ -161,7 +215,7 @@ class calcTM:
         """
 
         # get dimensions and length that will be useful for the for loops
-        total_num, frame_shape, slm_px_len, cam_px_len = self._calc_tm_dim()
+        total_num, frame_shape, slm_px_len, cam_px_len = self._calc_dim()
         
         # organize iterator over all frames into group of 4. Each group corresponds to 
         # the one 4-phase measurement, i.e. one slm vector with 4 grayscale levels
@@ -195,7 +249,7 @@ class calcTM:
     def _normalization_factor(self):
 
         # get dimensions and length that will be useful for the for loops
-        total_num, frame_shape, slm_px_len, cam_px_len = self._calc_tm_dim()
+        total_num, frame_shape, slm_px_len, cam_px_len = self._calc_dim()
         # organize iterator over all frames into group of 4. Each group corresponds to 
         # the one 4-phase measurement, i.e. one slm vector with 4 grayscale levels
         iterator = np.arange(0, total_num)
@@ -227,14 +281,14 @@ class calcTM:
         return norm_ij
     
     def _had2canonical(self, matrix):
-        _, _, slm_px_len, _ = self._calc_tm_dim()
+        _, _, slm_px_len, _ = self._calc_dim()
         h = hadamard(slm_px_len)
         tm_can = np.dot(matrix, h)
         return tm_can
 
     def calc_plot_tm(self):
         
-        tm_obs = self._calc_tm_obs()
+        tm_obs = self._calc_obs()
         norm = self._normalization_factor()
         tm_fil = tm_obs / norm
         tm = self._had2canonical(tm_fil)
@@ -255,90 +309,5 @@ class calcTM:
         fig.tight_layout()
         
         return tm_obs, norm, tm_fil, tm
-        
-
-
-class Target:
-    def __init__(self, shape) -> None:
-        self.shape = shape
-        
-    def square(self, focus_shape, offset_x=0, offset_y=0, intensity=1000):
-        # create a focus point
-        target_frame = np.full(shape=self.shape, fill_value=0).astype('float64')
-        target_focus = np.full(shape=focus_shape, fill_value=intensity).astype('float64')
-
-        # put it in the middle of the slm screen
-        # first calculate offsets from the image center
-        subpattern_dim = target_focus.shape
-        center_x = int(self.shape[1] / 2 - subpattern_dim[0] / 2) + offset_x
-        center_y = int(self.shape[1] / 2 - subpattern_dim[1] / 2) + offset_y
-
-        # and then add the vector in the center of the initialized pattern
-        target_frame[center_y:center_y + subpattern_dim[0], center_x:center_x + subpattern_dim[1]] = target_focus
-        
-        return target_frame
-
-    def some_other_pattern(self):
-        pass
     
-    
-class InverseLight:
-    
-    def __init__(self, target, tm, calib_px=112, mag=4):
-
-        self.target = target
-        self.shape = target.shape
-        self.tm = tm
-        self.calib_px = calib_px
-        
-        self.tm_shape = tm.shape
-        self.phase_mask_shape = (int(np.sqrt(self.tm_shape[1])), int(np.sqrt(self.tm_shape[1])))
-        self.phase_mask_mag = mag
-        
-    def _conj_trans(self):
-        """ Calculates conjugate transpose matrix of input transmission matrix
-
-        Returns:
-            _type_: _description_
-        """
-        tm_T_star = self.tm.transpose().conjugate()
-        return tm_T_star
-    
-    def inverse_prop(self):
-        """ Calculates the inverse light propagation and produces a phase mask
-
-        Returns
-        -------
-        _type_
-            _description_
-        """
-        
-        # first flatten frame
-        target_frame_flattened = []
-        for iy, ix in np.ndindex(self.shape):
-            target_frame_flattened.append(self.target[iy, ix])
-
-        target_frame_flattened = np.array(target_frame_flattened)
-
-        # apply inversion
-        # tm_T_star = self._conj_trans()
-        tm_T_star = self.tm.transpose().conjugate()
-        inverse = np.dot(tm_T_star, target_frame_flattened.T)
-
-        # get phase (in -pi to pi)
-        arg = np.angle(inverse, deg=False)
-        # scale phase between 0 and 2pi
-        arg2pi = (arg + 2 * np.pi) % (2 * np.pi)
-        # normalize to SLM 2pi calibration value
-        arg2SLM = arg2pi * self.calib_px / (2 * np.pi) 
-
-        # and unflatten to get a 2d SLM pattern
-        phase_mask = np.full(shape=self.phase_mask_shape, fill_value=0).astype('float64')
-        for idx, ij in enumerate(np.ndindex(self.phase_mask_shape[0], self.phase_mask_shape[1])):
-            phase_mask[ij[0], ij[1]] = arg2SLM[idx]
-            
-        # enlarge pattern for the SLM macropixels
-        self.phase_mask_enlarged = pt.Pattern._enlarge_pattern(phase_mask, self.phase_mask_mag)
-        
-        return self.phase_mask_enlarged
     
