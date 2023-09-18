@@ -2,6 +2,17 @@ from scipy import ndimage
 import numpy as np
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
+def set_roi(roi_size, roi_off):
+    offset_x, offset_y = roi_off
+    middle_x = int(1440 / 2) + offset_x
+    middle_y = int(1080 / 2) - offset_y
+
+    roi = (middle_x - int(roi_size / 2), 
+            middle_y - int(roi_size / 2), 
+            middle_x + int(roi_size / 2), 
+            middle_y + int(roi_size / 2))
+    
+    return roi
 
 def get_interferogram(roi=(0, 0, 1440, 1080), bins=(1,1), num_of_frames=1, exposure_time=5000, gain=1, timeout=10000, return_roi=True):
     camera = Cam(roi, bins, num_of_frames, exposure_time, gain, timeout, return_roi)

@@ -185,17 +185,17 @@ if __name__ == "__main__":
 
             print("Setting camera parameters...")
             camera.frames_per_trigger_zero_for_unlimited = 0
-            # camera.roi = (0, 0, 1440, 1080)
-            offset_x = 100
-            offset_y = 100
-            middle_x = int(1440 / 2) + offset_x
-            middle_y = int(1080 / 2) + offset_y
-            dim = 50
+            camera.roi = (0, 0, 1440, 1080)
+            # offset_x = 100
+            # offset_y = 100
+            # middle_x = int(1440 / 2) + offset_x
+            # middle_y = int(1080 / 2) + offset_y
+            # dim = 50
 
-            camera.roi = (middle_x - dim, 
-                middle_y - dim, 
-                middle_x + dim - 3  , 
-                middle_y + dim - 3)
+            # camera.roi = (middle_x - dim, 
+            #     middle_y - dim, 
+            #     middle_x + dim - 3  , 
+            #     middle_y + dim - 3)
             camera.exposure_time_us = 2000
             # middle_x = int(1440 / 2)
             # middle_y = int(1080 / 2)

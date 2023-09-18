@@ -17,8 +17,8 @@ import os
 
 class measTM:
 
-    def __init__(self, roi=(556, 476, 684 - 1, 604 - 1), bins=8, exposure_time=100, gain=1, timeout=100,
-                 order=4, mag=5,
+    def __init__(self, roi_size=100, roi_off=(0, 0), bins=8, exposure_time=100, gain=1, timeout=100,
+                 num_in=16, slm_macropixel_size=5,
                  monitor=1,
                  calib_px=112,
                  corr_path=None,
@@ -38,19 +38,20 @@ class measTM:
         """
         
         # camera settings
-        self.roi = roi
+        self.roi_size = roi_size
+        self.roi_off = roi_off
         self.bins = bins
         self.exposure_time = exposure_time
         self.gain = gain
         self.timeout = timeout
         
         # initiliaze camera
-        self.init_camera = cam.InitCamera(roi, bins, exposure_time, gain, timeout)
+        self.init_camera = cam.InitCamera(roi_size, roi_off, bins, exposure_time, gain, timeout)
         self.camera = self.init_camera.config()
         
-        # hadamard settings
-        self.order = order
-        self.mag = mag
+        # slm settings
+        self.num_in = num_in
+        self.slm_macropixel_size = slm_macropixel_size
         
         # correction pattern
         self.corr_path = corr_path
@@ -82,8 +83,8 @@ class measTM:
                                             upload_pattern_event,
                                             stop_all_event,
                                             calib_px = self.calib_px,
-                                            order=self.order,
-                                            mag=self.mag,
+                                            num_in=self.num_in,
+                                            slm_macropixel_size=self.slm_macropixel_size,
                                             path=self.corr_path)
 
         download_thread = cam.FrameAcquisitionThread(self.camera,
@@ -126,7 +127,7 @@ class measTM:
         _type_
             _description_
         """
-        basis = pt.Pattern._get_hadamard_basis(self.order)
+        basis = pt.Pattern._get_hadamard_basis(self.num_in)
         pi = int(self.calib_px / 2)
         four_phases = [0, pi / 2, pi, 3 * pi / 2]
         
@@ -143,7 +144,7 @@ class measTM:
         for vector in tqdm(basis, desc='Uploading Hadamard patterns', leave=True):
             # and for each vector load the four reference phases
             for phase in four_phases:
-                _, pattern = slm_patterns.hadamard_pattern_bis(vector, n=self.mag, gray=phase)
+                _, pattern = slm_patterns.hadamard_pattern_bis(vector, n=self.slm_macropixel_size, gray=phase)
                 self.slm.updateArray(pattern) # load each vector to slm
                 time.sleep(slm_delay)
                 # get frame for each phase
@@ -168,10 +169,9 @@ class measTM:
 
         timestr = time.strftime("%Y%m%d-%H%M")
         filename = '{}_tm_raw_data_ROI{}_Bins{}_Order{}_Mag{}.pkl'.format(timestr, 
-                                                                          self.roi, 
                                                                           self.bins, 
-                                                                          self.order, 
-                                                                          self.mag)
+                                                                          self.num_in, 
+                                                                          self.slm_macropixel_size)
         
         if self.save_path:
             filepath = os.path.join(self.save_path, filename)

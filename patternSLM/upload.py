@@ -6,7 +6,7 @@ import time, cv2
 
 class SlmUploadPatternsThread(threading.Thread):
     
-    def __init__(self, slm, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, order=4, mag=5, path=None):
+    def __init__(self, slm, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, num_in=16, slm_macropixel_size=5, path=None):
         """ This thread is designed to run in paraller with another thread that download frames from a camera. In particular
         this class uploads a hadamard vector on the SLM, sets a thread event that triggers the other thread to download a frame. 
         Then, it waits for a thread event to be set from the camera thread to upload the next hadamard vector. 
@@ -34,12 +34,12 @@ class SlmUploadPatternsThread(threading.Thread):
         self.slm = slm
         self.resX, self.resY = slm.getSize()
         self.calib_px = calib_px
-        self.order = order
-        self.mag = mag
-        self.length = 2 ** order
+        self.num_in = num_in
+        self.slm_macropixel_size = slm_macropixel_size
+        self.length = num_in
         
         self.slm_patterns = Pattern(self.resX, self.resY, calib_px)
-        self.basis = self.slm_patterns._get_hadamard_basis(self.order)
+        self.basis = self.slm_patterns._get_hadamard_basis(self.num_in)
         
         self.path = path
         if self.path is not None:
@@ -68,7 +68,7 @@ class SlmUploadPatternsThread(threading.Thread):
             for vector in tqdm(self.basis, desc='Uploading Hadamard patterns', leave=True):
                 # and for each vector load the four reference phases
                 for phase in self.four_phases:
-                    _, pattern = self.slm_patterns.hadamard_pattern_bis(vector, n=self.mag, gray=phase)
+                    _, pattern = self.slm_patterns.hadamard_pattern_bis(vector, n=self.slm_macropixel_size, gray=phase)
                     if self.path is not None:
                         pattern = self.slm_patterns.correct_aberrations(self.correction, pattern, alpha=.5)
                     self.upload.wait()

@@ -27,7 +27,7 @@ class Target:
     
 class InverseLight:
     
-    def __init__(self, target, tm, calib_px=112, mag=4):
+    def __init__(self, target, tm, calib_px=112, slm_macropixel=4):
 
         self.target = target
         self.shape = target.shape
@@ -36,7 +36,7 @@ class InverseLight:
         
         self.tm_shape = tm.shape
         self.phase_mask_shape = (int(np.sqrt(self.tm_shape[1])), int(np.sqrt(self.tm_shape[1])))
-        self.phase_mask_mag = mag
+        self.phase_mask_mag = slm_macropixel
         
     def _conj_trans(self):
         """ Calculates conjugate transpose matrix of input transmission matrix

@@ -4,17 +4,18 @@ from ..zeluxPy import helper_functions as cam
 import matplotlib.pyplot as plt
 from ..patternSLM import patterns as  pt
 
-def check(ij, order, mag, roi, bins, exposure_time, gain, timeout, norm=True):
+def check(ij, dim, slm_macropixel_size, roi, bins, exposure_time, gain, timeout, norm=True):
 # do some checks
 
     slm = slmpy.SLMdisplay(monitor=1)
     resX, resY = slm.getSize()
 
     slm_patterns = pt.Pattern(resX, resY)
-    _, pattern = slm_patterns.hadamard_pattern(order, ij, n=mag, gray=0)
+    _, pattern = slm_patterns.hadamard_pattern(dim, ij, n=slm_macropixel_size, gray=0)
 
     slm.updateArray(pattern)
     frame = cam.get_frame_binned(roi, bins, gain, exposure_time, gain, timeout)
+
     if norm:
         frame = cam.normalize_frame(frame[1])
 
@@ -36,7 +37,7 @@ def check(ij, order, mag, roi, bins, exposure_time, gain, timeout, norm=True):
     
     slm.close()
     
-    return pattern, frame
+    return pattern, frame    
 
 def plot_focus(frame1, frame2, norm=True):
 

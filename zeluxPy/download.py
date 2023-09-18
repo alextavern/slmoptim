@@ -5,14 +5,27 @@ import threading
 import numpy as np
 
 class InitCamera():
-    def __init__(self, roi, bins, exposure_time, gain, timeout):    
+    def __init__(self, roi_size=100, roi_off=(0, 0), bins=1, exposure_time=50, gain=1, timeout=100):    
         # camera settings
-        self.roi = roi
+        self.roi_size = roi_size
+        self.offset_x, self.offset_y = roi_off # roi offset from center
         self.bins = bins
         self.exposure_time = exposure_time
         self.gain = gain
         self.timeout = timeout
     
+    def set_roi(self):
+
+        middle_x = int(1440 / 2) + self.offset_x
+        middle_y = int(1080 / 2) - self.offset_y
+
+        roi = (middle_x - int(self.roi_size / 2), 
+               middle_y - int(self.roi_size / 2), 
+               middle_x + int(self.roi_size / 2), 
+               middle_y + int(self.roi_size / 2))
+        
+        return roi
+        
     def config(self):
         # camera instance
         self.sdk = TLCameraSDK()
@@ -23,7 +36,9 @@ class InitCamera():
         self.camera.exposure_time_us = self.exposure_time  # set exposure to 11 ms
         self.camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode
         self.camera.image_poll_timeout_ms = self.timeout  # 1 second polling timeout
-        self.camera.roi = self.roi
+        self.camera.roi = self.set_roi()
+        print(self.camera.roi)
+
         # set binning for macropixels
         (self.camera.binx, self.camera.biny) = (self.bins, self.bins)
 

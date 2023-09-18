@@ -125,19 +125,22 @@ class Pattern:
         return pattern.astype('uint8')
 
     @staticmethod
-    def _get_hadamard_basis(order):
+    def _get_hadamard_basis(dim):
         """
         calculates the outer product of all combination of the rows of a hadamard matrix of a given order to
         generate 2d patterns that constitute a hadamard basis.
         Parameters
         ----------
-        order: the order of the hadamard matrix (int)
+        dim: the dimensions of each basis vector dim x dim (int)
 
         Returns
         -------
         matrices: all the 2d patterns (array)
 
         """
+        
+        order = int((np.log2(dim)))
+
         h = hadamard(2 ** order)
         matrices = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
         return matrices
@@ -178,12 +181,12 @@ class Pattern:
         vector[vector == 1] = self.grayphase / 2  # phi = pi
         return vector
 
-    def hadamard_pattern(self, order, hadamard_vector_idx, n=1, gray=0):
+    def hadamard_pattern(self, dim, hadamard_vector_idx, n=1, gray=0):
         """
         creates a hadamard vector and puts it in the middle of the slm screen
         Parameters
         ----------
-        order: hadamard matrix order (int)
+        dim: hadamard matrix dimension dim x dim (int)
         hadamard_vector_idx: input of the index of the hadamard vector (tuple with 2 int)
         n: hadamard vector magnification factor
         gray: grayscale level of the unaffected slm screen (int)
@@ -200,6 +203,8 @@ class Pattern:
         pattern = np.full(shape=(cols, rows), fill_value=gray).astype('uint8')
 
         # get a 2d hadamard vector
+        order = int((np.log2(dim)))
+
         i, j = hadamard_vector_idx[0], hadamard_vector_idx[1]
         hadamard_vector = self._get_hadamard_vector(order, i, j)
         # enlarge vector
