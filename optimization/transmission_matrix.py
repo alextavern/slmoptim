@@ -1,6 +1,6 @@
 from ..patternSLM import patterns as pt
 from ..patternSLM import upload as up
-from ..zeluxPy import download as cam
+from ..zeluxPy import helper_functions as cam
 from slmPy import slmpy
 from scipy.linalg import hadamard
 import threading
@@ -48,6 +48,9 @@ class measTM:
         # initiliaze camera
         self.init_camera = cam.InitCamera(roi_size, roi_off, bins, exposure_time, gain, timeout)
         self.camera = self.init_camera.config()
+        
+        # get camera roi
+        self.roi = self.init_camera.set_roi()
         
         # slm settings
         self.num_in = num_in
@@ -159,19 +162,17 @@ class measTM:
         self.slm.close()
         self.init_camera.destroy()
         print("Program execution completed - camera and slm killed! ")
-        # data = []
-        # for item in four_intensities.items():
-        #     data.append(item[1])
             
         return self.patterns, self.frames
         
     def save(self):
 
         timestr = time.strftime("%Y%m%d-%H%M")
-        filename = '{}_tm_raw_data_ROI{}_Bins{}_Order{}_Mag{}.pkl'.format(timestr, 
-                                                                          self.bins, 
-                                                                          self.num_in, 
-                                                                          self.slm_macropixel_size)
+        filename = '{}_tm_raw_data_ROI{}_Bins{}_num_in{}_slm_macro{}.pkl'.format(timestr, 
+                                                                     self.roi,
+                                                                     self.bins, 
+                                                                     self.num_in, 
+                                                                     self.slm_macropixel_size)
         
         if self.save_path:
             filepath = os.path.join(self.save_path, filename)

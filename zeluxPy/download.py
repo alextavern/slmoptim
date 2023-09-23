@@ -4,59 +4,7 @@ from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 import threading
 import numpy as np
 
-class InitCamera():
-    def __init__(self, roi_size=100, roi_off=(0, 0), bins=1, exposure_time=50, gain=1, timeout=100):    
-        # camera settings
-        self.roi_size = roi_size
-        self.offset_x, self.offset_y = roi_off # roi offset from center
-        self.bins = bins
-        self.exposure_time = exposure_time
-        self.gain = gain
-        self.timeout = timeout
-    
-    def set_roi(self):
 
-        middle_x = int(1440 / 2) + self.offset_x
-        middle_y = int(1080 / 2) - self.offset_y
-
-        roi = (middle_x - int(self.roi_size / 2), 
-               middle_y - int(self.roi_size / 2), 
-               middle_x + int(self.roi_size / 2), 
-               middle_y + int(self.roi_size / 2))
-        
-        return roi
-        
-    def config(self):
-        # camera instance
-        self.sdk = TLCameraSDK()
-        available_cameras = self.sdk.discover_available_cameras()
-        self.camera = self.sdk.open_camera(available_cameras[0])
-
-        # configure
-        self.camera.exposure_time_us = self.exposure_time  # set exposure to 11 ms
-        self.camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode
-        self.camera.image_poll_timeout_ms = self.timeout  # 1 second polling timeout
-        self.camera.roi = self.set_roi()
-        print(self.camera.roi)
-
-        # set binning for macropixels
-        (self.camera.binx, self.camera.biny) = (self.bins, self.bins)
-
-        if self.camera.gain_range.max > self.gain:
-            db_gain = self.gain
-            gain_index = self.camera.convert_decibels_to_gain(db_gain)
-            self.camera.gain = gain_index
-
-        # arm - trigger
-        self.camera.arm(2)
-        self.camera.issue_software_trigger()
-        
-        return self.camera
-    
-    def destroy(self):
-        self.camera.disarm()
-        self.camera.dispose()
-        self.sdk.dispose()
         
         
 class FrameAcquisitionThread(threading.Thread):

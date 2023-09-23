@@ -17,7 +17,7 @@ def check(ij, dim, slm_macropixel_size, roi, bins, exposure_time, gain, timeout,
     frame = cam.get_frame_binned(roi, bins, gain, exposure_time, gain, timeout)
 
     if norm:
-        frame = cam.normalize_frame(frame[1])
+        frame = cam.normalize_frame(frame)
 
     fig, axs = plt.subplots(1, 2)
     axs[0].imshow(pattern)

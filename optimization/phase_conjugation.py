@@ -14,7 +14,7 @@ class Target:
         # first calculate offsets from the image center
         subpattern_dim = target_focus.shape
         center_x = int(self.shape[1] / 2 - subpattern_dim[0] / 2) + offset_x
-        center_y = int(self.shape[1] / 2 - subpattern_dim[1] / 2) + offset_y
+        center_y = int(self.shape[1] / 2 - subpattern_dim[1] / 2) - offset_y
 
         # and then add the vector in the center of the initialized pattern
         target_frame[center_y:center_y + subpattern_dim[0], center_x:center_x + subpattern_dim[1]] = target_focus
