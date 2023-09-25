@@ -332,3 +332,136 @@ class Pattern:
         
         return pattern.astype('uint8')
     
+    
+class PatternGenerator:
+    
+    def __init__(self, 
+             num_of_patterns, 
+             num_of_pixels, 
+             phase_range):
+
+        self.N = num_of_patterns
+        self.num_of_px = num_of_pixels
+        self.phase_range = phase_range
+    
+        self.patterns = self._create_patterns()
+
+    def __getitem__(self, idx):
+        item = self.patterns[idx]        
+        return item
+    
+    def __len__(self):
+        return len(self.patterns)
+    
+class RandomPatternGenerator(PatternGenerator):
+    
+    def _random_pattern(self):
+        """ creates a random 2d array pattern with N elements 
+            and pixel values that range between 0 and phase_range
+        """
+        phases = np.arange(self.phase_range)
+        pixels = np.random.choice(phases, self.num_of_px)
+        dim = int(self.num_of_px ** 0.5)
+        pattern = pixels.reshape(dim, dim)
+
+        return pattern
+    
+    def _create_patterns(self):
+        patterns = []
+        for i in range(self.N):
+            patterns.append(self._random_pattern())
+        return patterns
+    
+    
+class OnePixelPatternGenerator:
+    
+    def __init__(self,
+                 num_of_patterns, 
+                 num_of_pixels, 
+                 phase_range):
+        
+        self.N = num_of_patterns
+        self.num_of_px = num_of_pixels
+        self.phase_range = phase_range
+    
+        self.random_idx = self._get_random_pixels()
+        self.patterns = self._create_patterns()
+
+    def __getitem__(self, idx):
+        item = self.patterns[idx]        
+        return item
+    
+    def __len__(self):
+        return len(self.patterns)
+    
+    def _get_random_pixels(self):
+        """ creates all indices of a 2d matrix at a random order
+            in order to later sample randomly the pixels of a given mask
+        """
+        # this will be a list of tuples
+        indices = []
+        for i in np.arange(self.num_of_px):
+            for j in np.arange(self.num_of_px):
+                indices.append((i, j)) # append a tuple to list
+        # to array        
+        indices = np.array(indices)
+
+        # randomize
+        rng = np.random.default_rng()
+        rng.shuffle(indices)
+
+        return indices
+    
+    def _create_patterns(self):
+        """ creates a series of one-pixel 2d pattern by using the random indices from 
+            _get_random_pixels
+        """
+        gray = 0
+        phi = 1
+        patterns = []
+        for i, j in self.random_idx:
+            zero_pattern = np.array([[gray for _ in range(self.num_of_px)] for _ in range(self.num_of_px)]).astype('uint8')
+            temp = zero_pattern
+            temp[i, j] = phi
+            patterns.append(temp)
+            
+        return patterns
+    
+
+class HadamardPatternGenerator:
+    
+    def __init__(self, num_of_pixels):
+
+            self.num_of_px = num_of_pixels
+            self.patterns = self._create_patterns()
+
+    def __getitem__(self, idx):
+        item = self.patterns[idx]        
+        return item
+    
+    def __len__(self):
+        return len(self.patterns)
+    
+    def _create_patterns(self):
+        """
+        calculates the outer product of all combination of the rows of a hadamard matrix of a given order to
+        generate 2d patterns that constitute a hadamard basis.
+        Parameters
+        ----------
+        dim: the dimensions of each basis vector dim x dim (int)
+
+        Returns
+        -------
+        matrices: all the 2d patterns (array)
+
+        """
+        dim = int(self.num_of_px ** 0.5)
+        order = int((np.log2(dim)))
+
+        h = hadamard(2 ** order)
+        patterns = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
+        return patterns
+    
+patterns_loader = HadamardPatternGenerator(256)
+len(patterns_loader)
+    
