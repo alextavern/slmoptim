@@ -332,8 +332,8 @@ class Pattern:
         
         return pattern.astype('uint8')
     
-    
-class PatternGenerator:
+        
+class RandomPatternGenerator:
     
     def __init__(self, 
              num_of_patterns, 
@@ -344,16 +344,15 @@ class PatternGenerator:
         self.num_of_px = num_of_pixels
         self.phase_range = phase_range
     
-        self.patterns = self._create_patterns()
+        self.masks, self.patterns = self._create_patterns()
 
     def __getitem__(self, idx):
-        item = self.patterns[idx]        
-        return item
+        pattern = self.patterns[idx]
+        mask = self.masks[idx]        
+        return mask, pattern
     
     def __len__(self):
         return len(self.patterns)
-    
-class RandomPatternGenerator(PatternGenerator):
     
     def _random_pattern(self):
         """ creates a random 2d array pattern with N elements 
@@ -366,30 +365,51 @@ class RandomPatternGenerator(PatternGenerator):
 
         return pattern
     
+    def _random_partition(self):
+        """
+        """
+        mask = np.zeros(self.num_of_px, dtype=bool)
+        mask[:int((self.num_of_px) / 2)] = 1
+        np.random.shuffle(mask)
+        
+        new_dim = int(self.num_of_px ** 0.5)
+        mask = mask.reshape(new_dim, new_dim)
+        
+        return mask
+    
+    def _create_pattern(self):
+        gray=0
+        dim = int(self.num_of_px ** 0.5)
+        pattern = np.array([[gray for _ in range(dim)] for _ in range(dim)]).astype('uint8')
+        mask = self._random_partition()
+        pattern[mask] = 1
+        return mask, pattern
+
     def _create_patterns(self):
         patterns = []
+        masks = []
         for i in range(self.N):
-            patterns.append(self._random_pattern())
-        return patterns
+            mask, pattern = self._create_pattern()
+            patterns.append(pattern)
+            masks.append(mask)
+        return masks, patterns
     
     
 class OnePixelPatternGenerator:
     
-    def __init__(self,
-                 num_of_patterns, 
-                 num_of_pixels, 
-                 phase_range):
+    def __init__(self, 
+                 num_of_pixels):
         
-        self.N = num_of_patterns
-        self.num_of_px = num_of_pixels
-        self.phase_range = phase_range
+        self.N = int(num_of_pixels ** 0.5)
     
         self.random_idx = self._get_random_pixels()
-        self.patterns = self._create_patterns()
+        self.indices, self.masks, self.patterns = self._create_patterns()
 
     def __getitem__(self, idx):
-        item = self.patterns[idx]        
-        return item
+        pattern = self.patterns[idx] 
+        index = self.indices[idx] 
+        mask = self.masks[idx]      
+        return index, mask, pattern
     
     def __len__(self):
         return len(self.patterns)
@@ -400,8 +420,8 @@ class OnePixelPatternGenerator:
         """
         # this will be a list of tuples
         indices = []
-        for i in np.arange(self.num_of_px):
-            for j in np.arange(self.num_of_px):
+        for i in np.arange(self.N):
+            for j in np.arange(self.N):
                 indices.append((i, j)) # append a tuple to list
         # to array        
         indices = np.array(indices)
@@ -419,13 +439,22 @@ class OnePixelPatternGenerator:
         gray = 0
         phi = 1
         patterns = []
+        indices = []
+        masks = []
         for i, j in self.random_idx:
-            zero_pattern = np.array([[gray for _ in range(self.num_of_px)] for _ in range(self.num_of_px)]).astype('uint8')
+            mask = np.zeros(self.N ** 2, dtype=bool )
+            new_dim = int(self.N)
+            mask = mask.reshape(new_dim, new_dim)
+            
+            zero_pattern = np.array([[gray for _ in range(self.N)] for _ in range(self.N)]).astype('uint8')
             temp = zero_pattern
             temp[i, j] = phi
+            mask[i, j] = 1
             patterns.append(temp)
+            indices.append((i, j))
+            masks.append(mask)
             
-        return patterns
+        return indices, masks, patterns
     
 
 class HadamardPatternGenerator:
@@ -461,7 +490,3 @@ class HadamardPatternGenerator:
         h = hadamard(2 ** order)
         patterns = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
         return patterns
-    
-patterns_loader = HadamardPatternGenerator(256)
-len(patterns_loader)
-    
