@@ -45,7 +45,13 @@ class InverseLight:
             _type_: _description_
         """
         tm_T_star = self.tm.transpose().conjugate()
-        return tm_T_star
+        return self.tm_T_star
+        
+    def calc_inv_operator(self):
+        inv_operator = self.tm@self.tm_T_star
+        return inv_operator
+
+
     
     def inverse_prop(self):
         """ Calculates the inverse light propagation and produces a phase mask

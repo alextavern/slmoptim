@@ -3,22 +3,31 @@ from slmPy import slmpy
 from ..zeluxPy import helper_functions as cam
 import matplotlib.pyplot as plt
 from ..patternSLM import patterns as  pt
+import numpy as np
+import time
 
-def check(ij, dim, slm_macropixel_size, roi, bins, exposure_time, gain, timeout, norm=True):
-# do some checks
 
-    slm = slmpy.SLMdisplay(monitor=1)
-    resX, resY = slm.getSize()
-
+def check(slm, camera, 
+          N, ij, slm_macropix, 
+          remote=True, 
+          norm=False):
+    
+    resX, resY = (800, 600)
     slm_patterns = pt.Pattern(resX, resY)
-    _, pattern = slm_patterns.hadamard_pattern(dim, ij, n=slm_macropixel_size, gray=0)
-
-    slm.updateArray(pattern)
-    frame = cam.get_frame_binned(roi, bins, gain, exposure_time, gain, timeout)
-
+    _, pattern = slm_patterns.hadamard_pattern(N, ij, n=slm_macropix, gray=0)
+    
+    if remote:
+        slm.sendArray(pattern)
+    else:
+        slm.updateArray(pattern)
+    
+    time.sleep(0.5)
+    frame = camera.get_pending_frame_or_null()
+    frame = np.copy(frame.image_buffer)
+    
     if norm:
         frame = cam.normalize_frame(frame)
-
+    
     fig, axs = plt.subplots(1, 2)
     axs[0].imshow(pattern)
     axs[0].set_xlabel('SLM x pixels #')
@@ -35,13 +44,10 @@ def check(ij, dim, slm_macropixel_size, roi, bins, exposure_time, gain, timeout,
     
     fig.tight_layout()
     
-    slm.close()
-    
-    return pattern, frame    
+    return pattern, frame
 
 def plot_focus(frame1, frame2, norm=True):
 
-    
     fig, axs = plt.subplots(1, 2, figsize=(10, 10), sharex=True, sharey=True)
     if norm:
         frame1 = cam.normalize_frame(frame1)

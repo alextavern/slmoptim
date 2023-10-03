@@ -1,9 +1,7 @@
 from slmPy import slmpy
-from ..zeluxPy import helper_functions as cam
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
 class InitExperiment():
-
 
     def __init__(self, 
                  roi_size=100, 
@@ -12,6 +10,8 @@ class InitExperiment():
                  exposure_time=100, 
                  gain=1, 
                  timeout=100,
+                 remote=True,
+                 SERVER = '10.42.0.234', 
                  monitor=1): 
         
         # camera settings
@@ -22,16 +22,21 @@ class InitExperiment():
         self.gain = gain
         self.timeout = timeout
         
-        # slm setting
+        # slm settings
+        self.remote = remote
+        self.SERVER = SERVER
         self.monitor = monitor
         
     def init_slm(self):
-        self.slm = slmpy.SLMdisplay(self.monitor)
+        if self.remote:
+            self.slm = slmpy.Client()
+            self.slm.start(self.SERVER)
+        else:    
+            self.slm = slmpy.SLMdisplay(self.monitor)
         return self.slm
     
     def close_slm(self):
         self.slm.close()
-    
     
     def set_roi(self):
         """ Calculates the Region of interest. The user gives a window size and x, y offsets from
@@ -39,16 +44,23 @@ class InitExperiment():
 
         Returns
         -------
-        roi (tuple)
+        roi (tuple or int)
         """
+        print()
+        if type(self.roi_size) is tuple:
+            width, height = self.roi_size
+        else:
+            width = self.roi_size
+            height = width
+            
         offset_x, offset_y = self.roi_off
         middle_x = int(1440 / 2) + offset_x
         middle_y = int(1080 / 2) - offset_y
 
-        roi = (middle_x - int(self.roi_size / 2), 
-            middle_y - int(self.roi_size / 2), 
-            middle_x + int(self.roi_size / 2), 
-            middle_y + int(self.roi_size / 2))
+        roi = (middle_x - int(width/ 2), 
+            middle_y - int(height / 2), 
+            middle_x + int(width / 2), 
+            middle_y + int(height / 2))
         
         return roi
         

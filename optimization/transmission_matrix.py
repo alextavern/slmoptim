@@ -17,10 +17,12 @@ import os
 
 class measTM:
 
-    def __init__(self, roi_size=100, roi_off=(0, 0), bins=8, exposure_time=100, gain=1, timeout=100,
-                 num_in=16, slm_macropixel_size=5,
-                 monitor=1,
+    def __init__(self, 
+                 slm, camera, 
+                 num_in, 
+                 slm_macropixel_size,
                  calib_px=112,
+                 remote=True, 
                  corr_path=None,
                  save_path=None):
         """
@@ -37,32 +39,19 @@ class measTM:
         monitor
         """
         
-        # camera settings
-        self.roi_size = roi_size
-        self.roi_off = roi_off
-        self.bins = bins
-        self.exposure_time = exposure_time
-        self.gain = gain
-        self.timeout = timeout
-        
-        # initiliaze camera
-        self.init_camera = cam.InitCamera(roi_size, roi_off, bins, exposure_time, gain, timeout)
-        self.camera = self.init_camera.config()
-        
-        # get camera roi
-        self.roi = self.init_camera.set_roi()
+        # camera
+        self.camera = camera
         
         # slm settings
+        self.slm = slm
         self.num_in = num_in
         self.slm_macropixel_size = slm_macropixel_size
+        self.calib_px = calib_px
+        self.remote = remote # is the slm connected to a raspberry Pi ?
         
         # correction pattern
         self.corr_path = corr_path
         
-        # initialize slm
-        self.slm = slmpy.SLMdisplay(monitor=monitor)
-        self.calib_px = calib_px
-
         # save raw data path
         self.save_path = save_path
         
@@ -107,9 +96,9 @@ class measTM:
         # The main thread will wait for both threads to finish before continuing
         
         # Finally, kill all
-        self.slm.close()
-        self.init_camera.destroy()
-        print("Program execution completed - camera and slm killed! ")
+        # self.slm.close()
+        # self.init_camera.destroy()
+        # print("Program execution completed - camera and slm killed! ")
         
         # get and return data 
         self.patterns = upload_thread.patterns
@@ -138,7 +127,8 @@ class measTM:
         self.patterns = []
         self.frames = []
         
-        resX, resY = self.slm.getSize()
+        # resX, resY = self.slm.getSize()
+        resX, resY = (800, 600)
         slm_patterns = pt.Pattern(resX, resY)
 
 
@@ -148,7 +138,10 @@ class measTM:
             # and for each vector load the four reference phases
             for phase in four_phases:
                 _, pattern = slm_patterns.hadamard_pattern_bis(vector, n=self.slm_macropixel_size, gray=phase)
-                self.slm.updateArray(pattern) # load each vector to slm
+                if self.remote:
+                    self.slm.sendArray(pattern)
+                else:
+                    self.slm.updateArray(pattern) # load each vector to slm
                 time.sleep(slm_delay)
                 # get frame for each phase
                 frame = self.camera.get_pending_frame_or_null()
@@ -158,21 +151,17 @@ class measTM:
                 self.patterns.append(pattern)
                 self.frames.append(image_buffer_copy)
                 
-        # Finally, kill all
-        self.slm.close()
-        self.init_camera.destroy()
-        print("Program execution completed - camera and slm killed! ")
+
+        print("ΤΜ acquisition completed ! ")
             
         return self.patterns, self.frames
         
     def save(self):
 
         timestr = time.strftime("%Y%m%d-%H%M")
-        filename = '{}_tm_raw_data_ROI{}_Bins{}_num_in{}_slm_macro{}.pkl'.format(timestr, 
-                                                                     self.roi,
-                                                                     self.bins, 
-                                                                     self.num_in, 
-                                                                     self.slm_macropixel_size)
+        filename = '{}_tm_raw_data_num_in{}_slm_macro{}.pkl'.format(timestr,  
+                                                                    self.num_in, 
+                                                                    self.slm_macropixel_size)
         
         if self.save_path:
             filepath = os.path.join(self.save_path, filename)
@@ -309,6 +298,4 @@ class calcTM:
         fig.text(-0.01, 0.5, 'camera pixels #', va='center', rotation='vertical')
         fig.tight_layout()
         
-        return tm_obs, norm, tm_fil, tm
-    
-    
+        return tm_obs, norm, tm_fil, tm        
