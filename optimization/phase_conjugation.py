@@ -42,9 +42,9 @@ class InverseLight:
         """ Calculates conjugate transpose matrix of input transmission matrix
 
         Returns:
-            _type_: _description_
+            inv_operator: _description_
         """
-        tm_T_star = self.tm.transpose().conjugate()
+        self.tm_T_star = self.tm.transpose().conjugate()
         return self.tm_T_star
         
     def calc_inv_operator(self):

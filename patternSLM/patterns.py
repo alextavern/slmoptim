@@ -322,6 +322,11 @@ class Pattern:
 
         return matrix
     
+    def pattern2SLM(self, pattern, n):
+        temp = self._enlarge_pattern(pattern, n)
+        temp = self.add_subpattern(temp)
+        return temp
+    
     def correct_aberrations(self, correction, pattern, alpha=0.5):
 
         
@@ -490,3 +495,4 @@ class HadamardPatternGenerator:
         h = hadamard(2 ** order)
         patterns = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
         return patterns
+        
