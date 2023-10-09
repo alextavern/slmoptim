@@ -15,16 +15,28 @@ class IterationAlgos():
         and Hadamard Partition (HPA) algorithms. 
     """
     
-    def __init__(self, 
-                 slm, 
-                 camera,
+    algos = {}
+    
+    @classmethod
+    def register_algo(cls, algo_type):
+        def decorator(subclass):
+            cls.algos[algo_type] = subclass
+            return subclass
+        return decorator
+    
+    @classmethod
+    def create(cls, algo_type, params):
+        if algo_type not in cls.algos:
+            raise ValueError('wrong alto type {}'.format(algo_type))
+        return cls.algos[algo_type](params)
+    
+    def __init__(self, slm, camera, **kwargs
                  pattern_loader,
                  total_iterations=1,
                  slm_resolution=(800, 600),
                  slm_segments=256,
                  slm_macropixel=5, 
                  slm_calibration_pixel=112,
-                 type='continuous',
                  phase_steps=8,
                  remote=True,
                  save_path=None):
@@ -32,7 +44,7 @@ class IterationAlgos():
         self.slm = slm
         self.camera = camera
         
-        self.total_iterations = total_iterations
+        self.total_iterations = kwargs[]
 
         # slm settings
         self.N = int(slm_segments ** 0.5)
@@ -183,7 +195,11 @@ class IterationAlgos():
         
         """ The following classes can be condensed into only one in principle. To do. 
         """
+@IterationAlgos.register_algo('continuous')
 class ContinuousSequential(IterationAlgos):
+        
+    def __str__(self) -> str:
+        return "continuous"
         
     def run(self):
         
