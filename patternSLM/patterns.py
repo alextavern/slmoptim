@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 from scipy import signal
 from scipy.linalg import hadamard
+from LightPipes import *
 import random
 
 """
@@ -496,3 +497,29 @@ class HadamardPatternGenerator:
         patterns = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
         return patterns
         
+class GaussPatternGenerator:
+    def __init__(self, wavelength=632*nm, size):
+        self.num_of_px = num_of_pixels
+        self.patterns = self._create_patterns()
+    
+    def __getitem__(self, idx):
+        item = self.patterns[idx]        
+        return item
+    
+    def __len__(self):
+        return len(self.patterns)
+    
+    def _create_patterns(self):
+        wavelength = 632 * nm
+        size = 15 * mm
+        N = 300
+        w0 = 3 * mm
+        i = 0
+        LG = True
+
+        n = 10
+        m = 1
+        F = Begin(size, wavelength, N)
+        F = GaussBeam(F, w0, LG=LG, n=n, m=m)
+        # I = Intensity(0, F)git
+        Phi = Phase(F)
