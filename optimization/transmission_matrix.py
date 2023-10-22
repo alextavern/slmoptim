@@ -158,18 +158,29 @@ class measTM:
         
     def save(self):
 
-        timestr = time.strftime("%Y%m%d-%H%M")
+        timestr = time.strftime("%Y%m%d")
+        new_path = os.path.join(self.save_path, timestr)
+        
+        # check if dir exists
+        isExist = os.path.exists(new_path)
+        # and create it
+        if not isExist:
+            os.makedirs(new_path)
+        
         filename = '{}_tm_raw_data_num_in{}_slm_macro{}.pkl'.format(timestr,  
                                                                     self.num_in, 
                                                                     self.slm_macropixel_size)
         
         if self.save_path:
-            filepath = os.path.join(self.save_path, filename)
+            filepath = os.path.join(new_path, filename)
         else:
-            filepath=filename
+            filepath = filename
+        
+        print(filepath)
 
         with open(filepath, 'wb') as fp:
             pickle.dump((self.patterns, self.frames), fp)
+        
         
 
 class calcTM:
@@ -298,4 +309,5 @@ class calcTM:
         fig.text(-0.01, 0.5, 'camera pixels #', va='center', rotation='vertical')
         fig.tight_layout()
         
-        return tm_obs, norm, tm_fil, tm        
+        return tm_obs, norm, tm_fil, tm   
+             

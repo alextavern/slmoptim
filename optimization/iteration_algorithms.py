@@ -24,7 +24,6 @@ class IterationAlgos():
                  slm_segments=256,
                  slm_macropixel=5, 
                  slm_calibration_pixel=112,
-                 type='continuous',
                  phase_steps=8,
                  remote=True,
                  save_path=None):
@@ -79,7 +78,7 @@ class IterationAlgos():
         -------
         phi (int) calibrated for the SLM
         """
-        return (2 * (k + 1) / self.m) * self.calib_px
+        return (2 * (k + 1) / self.m) * self.calib_px / 2
     
     def create_pattern(self, k, mask, pattern):
         """ Prepares a pattern ready for the SLM: enlarges it according to the 
@@ -184,6 +183,7 @@ class IterationAlgos():
         """ The following classes can be condensed into only one in principle. To do. 
         """
 class ContinuousSequential(IterationAlgos):
+    
         
     def run(self):
         
@@ -194,33 +194,42 @@ class ContinuousSequential(IterationAlgos):
         counter = 0
         self.frames = {}
 
-        for iteration in range(0, self.total_iterations):   
+        for iteration in range(1, self.total_iterations+1):   
              
             # sweep each slm pixel
-            for _, mask, _ in tqdm((self.pattern_loader)):
-                temp_pattern = self.final_pattern.copy()
-                corr = []
-                # sweep phase at each pixel
-                for k in np.arange(0, self.m):
-                    # create pattern, i.e one pattern for each phase value
-                    temp = self.create_pattern(k, mask, temp_pattern)
+            with tqdm(self.pattern_loader) as pat_epoch:
+                for _, mask, _ in pat_epoch:
+                    temp_pattern = self.final_pattern.copy()
+                    corr = []
+                    # sweep phase at each pixel
+                    for k in np.arange(0, self.m):
+                        # create pattern, i.e one pattern for each phase value
+                        temp = self.create_pattern(k, mask, temp_pattern)
 
-                    # upload pattern to slm
-                    self.upload_pattern(temp)
+                        # upload pattern to slm
+                        self.upload_pattern(temp)
 
-                    # get interferogram from camera
-                    frame = self.get_frame()
+                        # get interferogram from camera
+                        frame = self.get_frame()
 
-                    # calculate correlation here
-                    corr_k = self.callback(frame)
-                    corr.append(corr_k)
+                        # calculate correlation here
+                        corr_k = self.callback(frame)
+                        corr.append(corr_k)
 
-                counter += 1 
-                self.frames[counter] = frame
+                    counter += 1 
+                    self.frames[counter] = frame
 
-                # update pattern with max corr
-                self.cost.append(np.max(corr))
-                self.final_pattern[mask] = self.phi_k(np.argmax(corr))
+                    # update pattern with max corr
+                    self.cost.append(np.max(corr))
+                    self.final_pattern[mask] = self.phi_k(np.argmax(corr))
+                                        
+                    # print out status message
+                    descr = [f"Iteration #: {iteration}",
+                               f"Pattern #: {counter}"]
+                    pat_epoch.set_description(' | '.join(descr))
+                    pat_epoch.set_postfix(Cost=np.max(corr))
+                    pat_epoch.refresh()
+
 
         return self.final_pattern, self.cost, self.frames
     
@@ -229,15 +238,15 @@ class StepwiseSequential(IterationAlgos):
     
     def run(self):
         gray = 0
-        final_pattern = np.array([[gray for _ in range(self.N)] for _ in range(self.N)]).astype('uint8')
-        final_pattern_k = final_pattern.copy()
+        self.final_pattern = np.array([[gray for _ in range(self.N)] for _ in range(self.N)]).astype('uint8')
+        self.final_pattern_k = self.final_pattern.copy()
         
-        cost = []
+        self.cost = []
         counter = 0
-        frames = {}
+        self.frames = {}
 
         for iteration in range(0, self.total_iterations):   
-            temp_pattern = final_pattern.copy() 
+            temp_pattern = self.final_pattern.copy() 
             # sweep each slm pixel
             for _, mask, _ in tqdm((self.pattern_loader)):               
                 corr = []
@@ -256,14 +265,14 @@ class StepwiseSequential(IterationAlgos):
                     corr.append(corr_k)
                 
                 counter += 1
-                frames[counter] = frame
-                temp_pattern = final_pattern.copy()
+                self.frames[counter] = frame
+                temp_pattern = self.final_pattern.copy()
                 
                 # update pattern with max corr
-                cost.append(np.max(corr))
+                self.cost.append(np.max(corr))
                 # pattern[idx[0], idx[1]] = self.phi_k(np.argmax(corr))
-                final_pattern_k[mask] = self.phi_k(np.argmax(corr))
-            final_pattern = final_pattern_k.copy()
+                self.final_pattern_k[mask] = self.phi_k(np.argmax(corr))
+            self.final_pattern = self.final_pattern_k.copy()
 
         return self.final_pattern, self.cost, self.frames
     
