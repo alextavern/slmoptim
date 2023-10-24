@@ -19,6 +19,7 @@ class measTM:
 
     def __init__(self, 
                  slm, camera, 
+                 pattern_loader,
                  num_in, 
                  slm_macropixel_size,
                  calib_px=112,
@@ -48,6 +49,9 @@ class measTM:
         self.slm_macropixel_size = slm_macropixel_size
         self.calib_px = calib_px
         self.remote = remote # is the slm connected to a raspberry Pi ?
+        
+        # load basis patterns
+        self.pattern_loader = pattern_loader
         
         # correction pattern
         self.corr_path = corr_path
@@ -102,7 +106,7 @@ class measTM:
         
         # get and return data 
         self.patterns = upload_thread.patterns
-        self.frames = download_thread.frames
+        self.frames = download_thread.frames, 
         
         return self.patterns, self.frames
     
@@ -119,42 +123,43 @@ class measTM:
         _type_
             _description_
         """
-        basis = pt.Pattern._get_hadamard_basis(self.num_in)
+        # basis = pt.Pattern._get_hadamard_basis(self.num_in)
         pi = int(self.calib_px / 2)
         four_phases = [0, pi / 2, pi, 3 * pi / 2]
         
         # four_intensities = {}
-        self.patterns = []
+        # self.patterns = []
         self.frames = []
         
         # resX, resY = self.slm.getSize()
-        resX, resY = (800, 600)
-        slm_patterns = pt.Pattern(resX, resY)
+        # resX, resY = (800, 600)
+        # slm_patterns = pt.Pattern(resX, resY)
 
 
-        # loop through each 2d vector of the hadamard basis - 
-        # basis is already generated here
-        for vector in tqdm(basis, desc='Uploading Hadamard patterns', leave=True):
+        # loop through each 2d vector of the loaded basis
+        # for vector in tqdm(basis, desc='Uploading Hadamard patterns', leave=True):
+        for vector in tqdm(self.pattern_loader, desc="Uploading pattern vectors", leave=True):
             # and for each vector load the four reference phases
             for phase in four_phases:
-                _, pattern = slm_patterns.hadamard_pattern_bis(vector, n=self.slm_macropixel_size, gray=phase)
+                # _, pattern = slm_patterns.hadamard_pattern_bis(vector, n=self.slm_macropixel_size, gray=phase)
                 if self.remote:
-                    self.slm.sendArray(pattern)
+                    self.slm.sendArray(vector)
                 else:
-                    self.slm.updateArray(pattern) # load each vector to slm
+                    self.slm.updateArray(vector) # load each vector to slm
                 time.sleep(slm_delay)
                 # get frame for each phase
                 frame = self.camera.get_pending_frame_or_null()
                 image_buffer_copy = np.copy(frame.image_buffer)
 
                 # four_intensities[idx, phase] = image_buffer_copy
-                self.patterns.append(pattern)
+                # self.patterns.append(vector)
                 self.frames.append(image_buffer_copy)
                 
 
         print("ΤΜ acquisition completed ! ")
             
-        return self.patterns, self.frames
+        # return self.patterns, self.frames
+        return self.frames
         
     def save(self):
 
@@ -179,7 +184,7 @@ class measTM:
         print(filepath)
 
         with open(filepath, 'wb') as fp:
-            pickle.dump((self.patterns, self.frames), fp)
+            pickle.dump((self.frames), fp)
         
         
 
@@ -209,11 +214,6 @@ class calcTM:
         return total_num, frame_shape, slm_px_len, cam_px_len
 
     def _calc_obs(self):
-        """_summary_
-
-        Returns:
-            _description_
-        """
 
         # get dimensions and length that will be useful for the for loops
         total_num, frame_shape, slm_px_len, cam_px_len = self._calc_dim()
@@ -282,6 +282,10 @@ class calcTM:
         return norm_ij
     
     def _had2canonical(self, matrix):
+        """ Perform a basis change: from the hadamard to the canonical one
+            by calculating the dot product between the measured TM and the hadamard
+            matrix on which the basis is created
+        """
         _, _, slm_px_len, _ = self._calc_dim()
         h = hadamard(slm_px_len)
         tm_can = np.dot(matrix, h)

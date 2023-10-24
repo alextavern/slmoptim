@@ -21,7 +21,7 @@ class Target:
         
         return target_frame
 
-    def some_other_pattern(self):
+    def gauss(self):
         pass
     
     

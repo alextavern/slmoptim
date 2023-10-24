@@ -2,6 +2,7 @@ import numpy as np
 import time, os
 import pickle
 from tqdm.auto import tqdm
+from tqdm import trange
 from slmOptim.patternSLM import patterns as pt
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -287,15 +288,17 @@ class HadamardPartition(IterationAlgos):
         pass
     
     
-class ZernikesPolynomials(IterationAlgos):
+
+                
+class ZernikePolynomials():
     
     def __init__(self, 
                 slm, 
                 camera,
-                slm_resolution=(800, 600),
+                slm_resolution=(600, 800),
                 slm_calibration_pixel=112,
-                num_of_zernike_coeffs=8,
-                radius=200, 
+                num_of_zernike_coeffs=4,
+                radius=300, 
                 center = [600 // 2, 800 // 2],
                 remote=True,
                 save_path=None):
@@ -307,7 +310,8 @@ class ZernikesPolynomials(IterationAlgos):
         resX, resY = slm_resolution
         self.patternSLM = pt.Pattern(resX, resY)
         self.calib_px = slm_calibration_pixel
-
+        self.shape = slm_resolution
+        
         # Zernike
         self.num_of_zernike_coeffs = num_of_zernike_coeffs
         self.radius = radius
@@ -320,7 +324,34 @@ class ZernikesPolynomials(IterationAlgos):
         # self.save_path = save_path
         # self.filepath = self._create_filepath()
     
+    def register_callback(self, callback):
+        """ This callback function is used to pass a custom cost function
+            to the optimization object
+
+        Parameters
+        ----------
+        callback
+            the cost function
+        """
+        self.callback = callback
+        
+    def upload_pattern(self, pattern, slm_delay=0.1):
+        """ Uploads a pattern to the SLM either in remote or local mode. Adds a user-defined
+            time delay to make sure that the pattern is uploaded. 
+        """
+        if self.remote:
+            self.slm.sendArray(pattern)
+        else:
+            self.slm.updateArray(pattern)
+        time.sleep(slm_delay)
+        
     
+    def get_frame(self):
+        """ Get frame from zelux thorlabs camera
+        """
+        frame = self.camera.get_pending_frame_or_null()
+        image_buffer = np.copy(frame.image_buffer)
+        return image_buffer
     
     def _get_disk_mask(self, center = None):
         '''
@@ -335,7 +366,8 @@ class ZernikesPolynomials(IterationAlgos):
             center = (shape[0] // 2, shape[1] // 2)
         X, Y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]))
         mask = (Y - center[0]) ** 2 + (X - center[1]) ** 2 < self.radius ** 2
-        return mask.astype('int')
+        
+        return mask.astype('bool')
     
     def _complex_mask_from_zernike_coeff(self, vec):
         '''
@@ -354,42 +386,65 @@ class ZernikesPolynomials(IterationAlgos):
         # put the Zernik mask at the right position and multiply by the disk mask
         mask = np.zeros(shape = self.shape, dtype='complex')
         mask[self.center[0] - self.radius:self.center[0] + self.radius,
-            self.center[1] - self.radius:self.center[1] + self.radius] = zern_mask * amp_mask
+             self.center[1] - self.radius:self.center[1] + self.radius] = zern_mask * amp_mask
         
         return mask
     
-    def run(self):
+    def _phase2SLM(self, mask):
+        arg = np.angle(mask, deg=False)
+        # scale phase between 0 and 2pi
+        arg2pi = (arg + 2 * np.pi) % (2 * np.pi)
+        arg2pi = arg + np.pi
+        # normalize to SLM 2pi calibration value
+        arg2SLM = arg2pi * self.calib_px / (2 * np.pi) 
+        
+        return arg2SLM.astype('uint8')
+        
+    
+    def run(self, coeff_range=(-2, 2, 0.5)):
         
         counter = 0
         frames = {}
+        masks = {}
         cost = []
         
         coeffs = np.zeros(self.num_of_zernike_coeffs)
-        phi_k = np.arange(-2, 2, 0.5)
+        phi_k = np.arange(coeff_range[0], coeff_range[1], coeff_range[2])
         
-        for idx in range(self.num_of_zernike_coeffs):
+        iterator = trange(self.num_of_zernike_coeffs)
+        for idx in iterator:
             cost_temp = []
             for phi in phi_k:
                 coeffs[idx] = phi
                 zmask = self._complex_mask_from_zernike_coeff(coeffs)
+                zmask = self._phase2SLM(zmask)
                 self.upload_pattern(zmask, 0.1)
                 
-                    # get interferogram from camera
+                # get interferogram from camera
                 frame = self.get_frame()
 
-                # calculate correlation here
+                # calculate cost function and save it
                 cost_k = self.callback(frame)
                 cost_temp.append(cost_k)
-                
-            counter += 1 
-            frames[counter] = frame
 
             # update pattern with max corr
-            self.cost.append(np.max(cost_temp))
-            coeffs[idx] = phi
+            cost.append(np.max(cost_temp))            
+            coeffs[idx] = phi_k[np.argmax(cost_temp)]
+            
+            # just reload the optimal mask for this iteration and save 
+            # the corresponding frame
+            counter += 1 
+            zmask = self._complex_mask_from_zernike_coeff(coeffs)
+            zmask = self._phase2SLM(zmask)
+            self.upload_pattern(zmask, 0.1)
+            frame = self.get_frame()
+            frames[counter] = frame
+            masks[counter] = zmask
+            
+            # print out status message
+            descr = [f"Iteration #: {idx}"]
+            iterator.set_description(' | '.join(descr))
+            iterator.set_postfix(Cost=cost[idx])
+            iterator.refresh()
 
-        return zmask, coeffs, cost
-                
-                    
-                    
-
+        return zmask, coeffs, cost, (masks, frames)

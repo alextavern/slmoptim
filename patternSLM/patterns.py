@@ -223,7 +223,7 @@ class Pattern:
 
         return hadamard_vector, pattern.astype('uint8')
 
-    def hadamard_pattern_bis(self, vector, n=1, gray=0):
+    def pattern2SLM(self, vector, n=1, gray=0):
         """
         creates a hadamard vector and puts it in the middle of the slm screen
         Parameters
@@ -243,22 +243,20 @@ class Pattern:
         # make sure that the image is composed by 8bit integers between 0 and 255
         pattern = np.full(shape=(cols, rows), fill_value=gray).astype('uint8')
 
-        # get a 2d hadamard vector
-        hadamard_vector = vector
-        # enlarge vector
-        hadamard_vector = self._enlarge_pattern(hadamard_vector, n)
+          # enlarge vector by "macropixeling"
+        vector = self._enlarge_pattern(vector, n)
         # replace values to grayscale-phase values
-        hadamard_vector = self._hadamard_int2phase(hadamard_vector)
+        vector = self._hadamard_int2phase(vector)
 
         # put it in the middle of the slm screen
         # first calculate offsets from the image center
-        subpattern_dim = hadamard_vector.shape
+        subpattern_dim = vector.shape
         offset_x = int(rows / 2 - subpattern_dim[0] / 2)
         offset_y = int(cols / 2 - subpattern_dim[1] / 2)
         # and then add the vector in the center of the initialized pattern
-        pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = hadamard_vector
+        pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = vector
 
-        return hadamard_vector, pattern.astype('uint8')
+        return vector, pattern.astype('uint8')
     
     def random(self, dim):
         """_summary_
@@ -465,17 +463,36 @@ class OnePixelPatternGenerator:
 
 class HadamardPatternGenerator:
     
-    def __init__(self, num_of_pixels):
+    def __init__(self, num_of_pixels, calib_px):
 
             self.num_of_px = num_of_pixels
+            self.calib_px = calib_px
             self.patterns = self._create_patterns()
 
     def __getitem__(self, idx):
-        item = self.patterns[idx]        
+        item = self.patterns[idx]
+        item = self._hadamard_int2phase(item)        
         return item
     
     def __len__(self):
         return len(self.patterns)
+    
+    def _hadamard_int2phase(self, vector):
+        """
+        replaces the elements of an hadamard vector (-1, 1) with the useful slm values (0, pi)
+        one needs to know the grayscale value of the slm that gives a phase shift of pi
+        Parameters
+        ----------
+        vector: 2d array
+
+        Returns
+        -------
+        vector: 2d array
+
+        """
+        vector[vector == -1] = 0     # phi = 0
+        vector[vector == 1] = self.calib_px / 2  # phi = pi
+        return vector
     
     def _create_patterns(self):
         """
@@ -487,7 +504,7 @@ class HadamardPatternGenerator:
 
         Returns
         -------
-        matrices: all the 2d patterns (array)
+        patterns: all the 2d patterns (array)
 
         """
         dim = int(self.num_of_px ** 0.5)
@@ -495,31 +512,80 @@ class HadamardPatternGenerator:
 
         h = hadamard(2 ** order)
         patterns = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
+        
         return patterns
         
 class GaussPatternGenerator:
-    def __init__(self, wavelength=632*nm, size):
-        self.num_of_px = num_of_pixels
+    
+    def __init__(self, N, num=16, LG=True,
+                 w0=3e-3, 
+                 wavelength=632e-9, 
+                 size=15e-3, 
+                 slm_calibration_px=112):
+        
+        self.N = N  # number of pixles
+        self.w0 = w0 # waist
+        self.wavelength = wavelength # wavelenght
+        self.size = size 
+        self.LG = LG # Hermite-Gauss or Laguerre Gauss
+        self.num = num # number of vectors
+        self.calib_px = slm_calibration_px
+        
         self.patterns = self._create_patterns()
     
     def __getitem__(self, idx):
-        item = self.patterns[idx]        
-        return item
+        amp, phi = self.patterns[idx]    
+        phi = self._gauss_int2phase(phi)
+        return amp, phi
     
     def __len__(self):
         return len(self.patterns)
     
-    def _create_patterns(self):
-        wavelength = 632 * nm
-        size = 15 * mm
-        N = 300
-        w0 = 3 * mm
-        i = 0
-        LG = True
+    def _gauss_int2phase(self, vector):
+        """
+        replaces the elements of an hadamard vector (-1, 1) with the useful slm values (0, pi)
+        one needs to know the grayscale value of the slm that gives a phase shift of pi
+        Parameters
+        ----------
+        vector: 2d array
 
-        n = 10
-        m = 1
-        F = Begin(size, wavelength, N)
-        F = GaussBeam(F, w0, LG=LG, n=n, m=m)
-        # I = Intensity(0, F)git
-        Phi = Phase(F)
+        Returns
+        -------
+        vector: 2d array
+
+        """
+        vector[vector == -1] = 0     # phi = 0
+        vector[vector == 1] = self.calib_px / 2  # phi = pi
+        return vector
+    
+    def _create_sorted_indices(self):
+        """ Create a a list of sorted 2d indices in order to generate
+            vectors with increased spatial frequency.
+
+        Returns
+        -------
+        a list of lists
+        """
+        indices = []
+        for n in range(self.num):
+            for m in range(self.num):
+                indices.append([n, m])
+        return sorted(indices, key=sum)
+    
+    def _create_patterns(self):
+        """ Uses LightPipe library to create HG or LG patterns
+
+        Returns
+        -------
+            a list with all created patterns
+        """
+        patterns = []
+        
+        F = Begin(self.size, self.wavelength, self.N)
+        indices = self._create_sorted_indices()
+        for n, m in indices:
+                F = GaussBeam(F, self.w0, LG=self.LG, n=m, m=n)
+                Amp = Intensity(0, F)
+                Phi = Phase(F)
+                patterns.append((Amp, Phi))
+        return patterns
