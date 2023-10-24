@@ -368,7 +368,7 @@ class ZernikePolynomials():
         mask = (Y - center[0]) ** 2 + (X - center[1]) ** 2 < self.radius ** 2
         
         return mask.astype('bool')
-    
+        
     def _complex_mask_from_zernike_coeff(self, vec):
         '''
         Generate a complex phase mask from a vector containting the coefficient of the first Zernike polynoms.
@@ -379,6 +379,8 @@ class ZernikePolynomials():
         '''
         # Generate a complex phase mask from the coefficients
         zern_mask = np.exp(1j * phaseFromZernikes(vec, 2 * self.radius))
+        
+        gauss_mask = np.exp(1j * self._phaseFromGauss(vec, 2 * self.radius))
         
         # We want the amplitude to be 0 outside the disk, we fist generate a binary disk mask
         amp_mask = self._get_disk_mask()
