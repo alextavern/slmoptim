@@ -286,10 +286,10 @@ class HadamardPartition(IterationAlgos):
     
     def run():
         pass
-    
-    
 
-                
+""" This class is implementing an idea found here https://www.wavefrontshaping.net/post/id/23
+    that uses Zenike Polynomials to optimize optical aberrations on a focused laser bea,
+"""
 class ZernikePolynomials():
     
     def __init__(self, 
@@ -355,6 +355,7 @@ class ZernikePolynomials():
     
     def _get_disk_mask(self, center = None):
         '''
+        Taken from S. Popoff blog
         Generate a binary mask with value 1 inside a disk, 0 elsewhere
         :param shape: list of integer, shape of the returned array
         :radius: integer, radius of the disk
@@ -371,6 +372,7 @@ class ZernikePolynomials():
         
     def _complex_mask_from_zernike_coeff(self, vec):
         '''
+        Taken from S. Popoff blog
         Generate a complex phase mask from a vector containting the coefficient of the first Zernike polynoms.
         :param DMD_resolution: list of integers, contains the resolution of the DMD, e.g. [1920,1200]
         :param: integer, radius of the illumination disk on the DMD
@@ -379,13 +381,11 @@ class ZernikePolynomials():
         '''
         # Generate a complex phase mask from the coefficients
         zern_mask = np.exp(1j * phaseFromZernikes(vec, 2 * self.radius))
-        
-        gauss_mask = np.exp(1j * self._phaseFromGauss(vec, 2 * self.radius))
-        
+                
         # We want the amplitude to be 0 outside the disk, we fist generate a binary disk mask
         amp_mask = self._get_disk_mask()
         
-        # put the Zernik mask at the right position and multiply by the disk mask
+        # put the Zernike mask at the right position and multiply by the disk mask
         mask = np.zeros(shape = self.shape, dtype='complex')
         mask[self.center[0] - self.radius:self.center[0] + self.radius,
              self.center[1] - self.radius:self.center[1] + self.radius] = zern_mask * amp_mask
@@ -393,9 +393,11 @@ class ZernikePolynomials():
         return mask
     
     def _phase2SLM(self, mask):
+        """ Converts a phase mask to the SLM readable  and phase-calibrated format
+        """
         arg = np.angle(mask, deg=False)
         # scale phase between 0 and 2pi
-        arg2pi = (arg + 2 * np.pi) % (2 * np.pi)
+        # arg2pi = (arg + 2 * np.pi) % (2 * np.pi)
         arg2pi = arg + np.pi
         # normalize to SLM 2pi calibration value
         arg2SLM = arg2pi * self.calib_px / (2 * np.pi) 
@@ -410,14 +412,16 @@ class ZernikePolynomials():
         masks = {}
         cost = []
         
+        # initialize the coefficients to optimize
         coeffs = np.zeros(self.num_of_zernike_coeffs)
-        phi_k = np.arange(coeff_range[0], coeff_range[1], coeff_range[2])
+        # 
+        coeff_idx = np.arange(coeff_range[0], coeff_range[1], coeff_range[2])
         
         iterator = trange(self.num_of_zernike_coeffs)
         for idx in iterator:
             cost_temp = []
-            for phi in phi_k:
-                coeffs[idx] = phi
+            for coeff in coeff_idx:
+                coeffs[idx] = coeff
                 zmask = self._complex_mask_from_zernike_coeff(coeffs)
                 zmask = self._phase2SLM(zmask)
                 self.upload_pattern(zmask, 0.1)
@@ -431,7 +435,7 @@ class ZernikePolynomials():
 
             # update pattern with max corr
             cost.append(np.max(cost_temp))            
-            coeffs[idx] = phi_k[np.argmax(cost_temp)]
+            coeffs[idx] = coeff_idx[np.argmax(cost_temp)]
             
             # just reload the optimal mask for this iteration and save 
             # the corresponding frame

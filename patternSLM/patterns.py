@@ -82,6 +82,28 @@ class Pattern:
         pattern[:cols, int(rows / a):] = int(gray2)
 
         return pattern.astype('uint8')
+    
+    def grad_mirror(self, axis=0):
+        """
+        creates a gradient mirror
+
+        Parameters
+        ----------
+        axis: int
+
+        Returns
+        -------
+        pattern: 2d array
+        """
+        gray = self.grayphase
+        x = np.linspace(0, gray, 800)
+        y = np.linspace(0, gray, 600)
+        X, Y = np.meshgrid(x, y)
+        
+        if axis == 0: pattern = X
+        else: pattern = Y
+
+        return pattern.astype('uint8')
 
     def grating(self, sq_amp=255, sq_period=100):
         """
@@ -223,13 +245,14 @@ class Pattern:
 
         return hadamard_vector, pattern.astype('uint8')
 
-    def pattern2SLM(self, vector, n=1, gray=0):
+    def enlarge_to_SLM(self, vector, n=1, gray=0):
         """
-        creates a hadamard vector and puts it in the middle of the slm screen
+        puts an enlarged vector in the middle of the slm screen
+        
         Parameters
         ----------
-        vector: one hadamard vector
-        n: hadamard vector magnification factor
+        vector: input vector
+        n: vector magnification factor
         gray: grayscale level of the unaffected slm screen (int)
 
         Returns
@@ -256,7 +279,7 @@ class Pattern:
         # and then add the vector in the center of the initialized pattern
         pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = vector
 
-        return vector, pattern.astype('uint8')
+        return pattern.astype('uint8')
     
     def random(self, dim):
         """_summary_
@@ -418,6 +441,23 @@ class OnePixelPatternGenerator:
     def __len__(self):
         return len(self.patterns)
     
+    def _get_disk_mask(self, center = None):
+        '''
+        Taken from S. Popoff blog
+        Generate a binary mask with value 1 inside a disk, 0 elsewhere
+        :param shape: list of integer, shape of the returned array
+        :radius: integer, radius of the disk
+        :center: list of integers, position of the center
+        :return: numpy array, the resulting binary mask
+        '''
+        shape = [2 * self.radius] * 2
+        if not center:
+            center = (shape[0] // 2, shape[1] // 2)
+        X, Y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]))
+        mask = (Y - center[0]) ** 2 + (X - center[1]) ** 2 < self.radius ** 2
+        
+        return mask.astype('bool')
+    
     def _get_random_pixels(self):
         """ creates all indices of a 2d matrix at a random order
             in order to later sample randomly the pixels of a given mask
@@ -447,6 +487,7 @@ class OnePixelPatternGenerator:
         masks = []
         for i, j in self.random_idx:
             mask = np.zeros(self.N ** 2, dtype=bool )
+            mask = self._get_disk_mask()
             new_dim = int(self.N)
             mask = mask.reshape(new_dim, new_dim)
             

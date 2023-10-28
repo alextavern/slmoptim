@@ -21,13 +21,29 @@ class Target:
         
         return target_frame
 
-    def gauss(self):
-        pass
+    def gauss(self, 
+              order=0,
+              num=1, 
+              w0=4e-4, 
+              wavelength=632e-9, 
+              size=15e-3, 
+              slm_calibration_px=112):
+                 
+        N = int(self.shape[0])
+        gauss = pt.GaussPatternGenerator(N=N, num=num, LG=True,
+                                        w0=w0, 
+                                        wavelength=wavelength, 
+                                        size=size, 
+                                        slm_calibration_px=slm_calibration_px) 
+        amp, phase = gauss[order]
+        complex_field = amp * np.exp(1j * phase)
+        
+        return complex_field
     
     
 class InverseLight:
     
-    def __init__(self, target, tm, calib_px=112, slm_macropixel=4):
+    def __init__(self, target, tm, calib_px=56, slm_macropixel=4):
 
         self.target = target
         self.shape = target.shape
@@ -46,20 +62,20 @@ class InverseLight:
         """
         self.tm_T_star = self.tm.transpose().conjugate()
         return self.tm_T_star
+    
+    def _inverse(self):
+        self.tm_inv = np.linalg.inv(self.tm)
+        return self.tm_inv
+
         
     def calc_inv_operator(self):
         inv_operator = self.tm@self.tm_T_star
         return inv_operator
 
-
     
-    def inverse_prop(self):
-        """ Calculates the inverse light propagation and produces a phase mask
-
-        Returns
-        -------
-        _type_
-            _description_
+    def inverse_prop(self, conj=True):
+        """ Calculates the inverse light propagation and produces a phase mask.
+            User must define inversion method: phase conjugation or matrix inversion.
         """
         
         # first flatten frame
@@ -70,9 +86,14 @@ class InverseLight:
         target_frame_flattened = np.array(target_frame_flattened)
 
         # apply inversion
-        # tm_T_star = self._conj_trans()
-        tm_T_star = self.tm.transpose().conjugate()
-        inverse = np.dot(tm_T_star, target_frame_flattened.T)
+        if conj:
+            # tm_T_star = self._conj_trans()
+            tm_inv = self._conj_trans()
+        else:
+            tm_inv = self._inverse()
+            
+        # inverse = np.dot(tm_T_star, target_frame_flattened.T)
+        inverse = tm_inv@target_frame_flattened.T
 
         # get phase (in -pi to pi)
         arg = np.angle(inverse, deg=False)

@@ -40,4 +40,4 @@ def snr(frame, mask_radius=8, mask_offset=(0, 0), intesity_only=False):
         noise = np.sum((frame) * (1. - mask)) / np.sum(1. - mask)
         cost = signal / noise
 
-    return cost    
+    return cost, mask    
