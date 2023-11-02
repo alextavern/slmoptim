@@ -69,10 +69,24 @@ class InverseLight:
 
         
     def calc_inv_operator(self):
-        inv_operator = self.tm@self.tm_T_star
-        return inv_operator
+        self.inv_operator_focus = self.tm@self.tm_T_star
+        self.inv_operator_detection = self.tm_T_star@self.tm
+
+        return self.inv_operator_focus, self.inv_operator_detection
 
     
+    def snr(self):
+        matrix = abs(self.inv_operator_focus)
+        
+        signal = np.mean(np.diag(matrix))
+        
+        mask = ~np.eye(matrix.shape[0], dtype=bool)
+        noise = np.mean(matrix * mask)
+        
+        snr = signal / noise
+        
+        return snr
+        
     def inverse_prop(self, conj=True):
         """ Calculates the inverse light propagation and produces a phase mask.
             User must define inversion method: phase conjugation or matrix inversion.

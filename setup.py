@@ -5,8 +5,9 @@ setup(name='slmOptim',
       description='A collection of packages for an optimization problem using a Spatial Light Modulator',
       author='Alexandros Tavernarakis',
       author_email='alexandre.tavernarakis@universite-paris-saclay.fr',
-      packages=['patternSLM', 'zeluxPy'],
+      packages=['optimization', 'patternSLM', 'zeluxPy'],
       py_modules=['.slmpy'],
       install_requires=['numpy', 'pandas', 'scipy'],
+      scripts=["speckle_analysis.py", "transmission_matrix.py", "optimizataion.py"]
       )
 

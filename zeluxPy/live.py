@@ -196,7 +196,7 @@ if __name__ == "__main__":
             #     middle_y - dim, 
             #     middle_x + dim - 3  , 
             #     middle_y + dim - 3)
-            camera.exposure_time_us = 2000
+            camera.exposure_time_us = 1000
             # middle_x = int(1440 / 2)
             # middle_y = int(1080 / 2)
             # dim = 49
@@ -204,7 +204,8 @@ if __name__ == "__main__":
             # camera.roi = roi
             # camera.exposure_time_us = 400  # set exposure to 11 ms
             # camera.image_poll_timeout_ms = 100  # 1 second polling timeout
-            # (camera.binx, camera.biny) = (1, 1)
+            bins = 1
+            (camera.binx, camera.biny) = (bins, bins)
 
             
             camera.arm(2)

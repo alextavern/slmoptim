@@ -1,6 +1,7 @@
 from ..patternSLM import patterns as pt
 from ..patternSLM import upload as up
 from ..zeluxPy import helper_functions as cam
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from slmPy import slmpy
 from scipy.linalg import hadamard
 import threading
@@ -10,6 +11,7 @@ import pickle
 import matplotlib.pyplot as plt
 import time
 import os
+import warnings
 
 """
 """
@@ -140,6 +142,11 @@ class measTM:
                 # get frame for each phase
                 frame = self.camera.get_pending_frame_or_null()
                 image_buffer_copy = np.copy(frame.image_buffer)
+                
+                # check saturation
+                max_level = np.amax(image_buffer_copy)
+                if max_level > 1000:
+                    warnings.warn("Pixel saturation: {}.".format(max_level), UserWarning)
 
                 self.frames.append(image_buffer_copy)
                 
@@ -217,7 +224,7 @@ class calcTM:
         
         # loop through every pixel of a camera frame (2d array)
         cam_px_idx = 0
-        for iy, ix in np.ndindex(frame_shape):
+        for iy, ix in tqdm(np.ndindex(frame_shape), desc='Iterating through camera pixels', leave=True):
             slm_px_idx = 0
             # loop through every 4-phase measurement - equivalently every slm pixel
             for subiterator in iterator:
@@ -282,9 +289,22 @@ class calcTM:
         tm = self._had2canonical(tm_fil)
         
         fig, axs = plt.subplots(nrows=1, ncols=3, sharex=True, sharey=True, figsize=figsize)
-        axs[0].imshow(abs(tm_obs), aspect='auto')
-        axs[1].imshow(abs(tm_fil), aspect='auto')
-        axs[2].imshow(abs(tm), aspect='auto')
+        
+        obs = axs[0].imshow(abs(tm_obs), aspect='auto')
+        divider = make_axes_locatable(axs[0])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(obs, cax=cax)
+        
+        
+        fil = axs[1].imshow(abs(tm_fil), aspect='auto')
+        divider = make_axes_locatable(axs[1])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(fil, cax=cax)
+        
+        can = axs[2].imshow(abs(tm), aspect='auto')
+        divider = make_axes_locatable(axs[2])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(can, cax=cax)
 
         axs[0].set_title("Hadamard TM")
         axs[1].set_title("Filtered TM")
