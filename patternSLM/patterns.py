@@ -421,13 +421,12 @@ class RandomPatternGenerator:
             masks.append(mask)
         return masks, patterns
     
+class OnePixelPatternGenerator2:
     
-class OnePixelPatternGenerator:
-    
-    def __init__(self, 
-                 num_of_pixels):
+    def __init__(self, radius):
         
-        self.N = int(num_of_pixels ** 0.5)
+        self.radius = radius
+        self.N = 2 * radius
     
         self.random_idx = self._get_random_pixels()
         self.indices, self.masks, self.patterns = self._create_patterns()
@@ -441,32 +440,31 @@ class OnePixelPatternGenerator:
     def __len__(self):
         return len(self.patterns)
     
-    def _get_disk_mask(self, center = None):
-        '''
-        Taken from S. Popoff blog
-        Generate a binary mask with value 1 inside a disk, 0 elsewhere
-        :param shape: list of integer, shape of the returned array
-        :radius: integer, radius of the disk
-        :center: list of integers, position of the center
-        :return: numpy array, the resulting binary mask
-        '''
-        shape = [2 * self.radius] * 2
-        if not center:
-            center = (shape[0] // 2, shape[1] // 2)
-        X, Y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]))
-        mask = (Y - center[0]) ** 2 + (X - center[1]) ** 2 < self.radius ** 2
+    def _get_disk_mask(self):
+
+        res = (self.N, self.N)
         
-        return mask.astype('bool')
+        mask_center = [res[0] // 2,res[1] // 2]
+        X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
+
+        # We generate a mask representing the disk we want to intensity to be concentrated in
+        mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
+        
+        return mask
     
     def _get_random_pixels(self):
         """ creates all indices of a 2d matrix at a random order
             in order to later sample randomly the pixels of a given mask
         """
+        disk = self._get_disk_mask()
         # this will be a list of tuples
         indices = []
         for i in np.arange(self.N):
             for j in np.arange(self.N):
-                indices.append((i, j)) # append a tuple to list
+                if disk[i, j]:
+                    indices.append((i, j)) # append a tuple to list
+#         indices = np.vstack([disk.argmax(axis=0), np.arange(len(disk[0]))]).T[disk.sum(0) > 0]
+
         # to array        
         indices = np.array(indices)
 
@@ -487,7 +485,85 @@ class OnePixelPatternGenerator:
         masks = []
         for i, j in self.random_idx:
             mask = np.zeros(self.N ** 2, dtype=bool )
-            mask = self._get_disk_mask()
+            new_dim = int(self.N)
+            mask = mask.reshape(new_dim, new_dim)
+            
+            zero_pattern = np.array([[gray for _ in range(self.N)] for _ in range(self.N)]).astype('uint8')
+            temp = zero_pattern
+            temp[i, j] = phi
+            mask[i, j] = 1
+            patterns.append(temp)
+            indices.append((i, j))
+            masks.append(mask)
+            
+        return indices, masks, patterns
+    
+    
+class OnePixelPatternGenerator:
+    
+    def __init__(self, slm_segments):
+        
+        disk_diameter = int(slm_segments ** 0.5)
+        self.radius = disk_diameter // 2
+        self.N = disk_diameter
+    
+        self.random_idx = self._get_random_pixels()
+        self.indices, self.masks, self.patterns = self._create_patterns()
+
+    def __getitem__(self, idx):
+        pattern = self.patterns[idx] 
+        index = self.indices[idx] 
+        mask = self.masks[idx]      
+        return index, mask, pattern
+    
+    def __len__(self):
+        return len(self.patterns)
+    
+    def _get_disk_mask(self):
+
+        res = (self.N, self.N)
+        
+        mask_center = [res[0] // 2,res[1] // 2]
+        X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
+
+        # We generate a mask representing the disk we want to intensity to be concentrated in
+        mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
+        
+        return mask
+    
+    def _get_random_pixels(self):
+        """ creates all indices of a 2d matrix at a random order
+            in order to later sample randomly the pixels of a given mask
+        """
+        disk = self._get_disk_mask()
+        # this will be a list of tuples
+        indices = []
+        for i in np.arange(self.N):
+            for j in np.arange(self.N):
+                if disk[i, j]:
+                    indices.append((i, j)) # append a tuple to list
+#         indices = np.vstack([disk.argmax(axis=0), np.arange(len(disk[0]))]).T[disk.sum(0) > 0]
+
+        # to array        
+        indices = np.array(indices)
+
+        # randomize
+        rng = np.random.default_rng()
+        rng.shuffle(indices)
+
+        return indices
+    
+    def _create_patterns(self):
+        """ creates a series of one-pixel 2d pattern by using the random indices from 
+            _get_random_pixels
+        """
+        gray = 0
+        phi = 1
+        patterns = []
+        indices = []
+        masks = []
+        for i, j in self.random_idx:
+            mask = np.zeros(self.N ** 2, dtype=bool )
             new_dim = int(self.N)
             mask = mask.reshape(new_dim, new_dim)
             
