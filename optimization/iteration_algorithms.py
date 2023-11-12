@@ -26,6 +26,7 @@ class IterationAlgos():
                  slm_macropixel=5, 
                  slm_calibration_pixel=112,
                  phase_steps=8,
+                 type="cont",
                  remote=True,
                  save_path=None):
         
