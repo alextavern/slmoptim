@@ -360,143 +360,84 @@ class Pattern:
         return pattern.astype('uint8')
     
         
-class RandomPatternGenerator:
-    
-    def __init__(self, 
-             num_of_patterns, 
-             num_of_pixels, 
-             phase_range):
 
-        self.N = num_of_patterns
-        self.num_of_px = num_of_pixels
-        self.phase_range = phase_range
     
-        self.masks, self.patterns = self._create_patterns()
-
-    def __getitem__(self, idx):
-        pattern = self.patterns[idx]
-        mask = self.masks[idx]        
-        return mask, pattern
+# class OnePixelPatternGenerator2:
     
-    def __len__(self):
-        return len(self.patterns)
-    
-    def _random_pattern(self):
-        """ creates a random 2d array pattern with N elements 
-            and pixel values that range between 0 and phase_range
-        """
-        phases = np.arange(self.phase_range)
-        pixels = np.random.choice(phases, self.num_of_px)
-        dim = int(self.num_of_px ** 0.5)
-        pattern = pixels.reshape(dim, dim)
-
-        return pattern
-    
-    def _random_partition(self):
-        """
-        """
-        mask = np.zeros(self.num_of_px, dtype=bool)
-        mask[:int((self.num_of_px) / 2)] = 1
-        np.random.shuffle(mask)
+#     def __init__(self, radius):
         
-        new_dim = int(self.num_of_px ** 0.5)
-        mask = mask.reshape(new_dim, new_dim)
+#         self.radius = radius
+#         self.N = 2 * radius
+    
+#         self.random_idx = self._get_random_pixels()
+#         self.indices, self.masks, self.patterns = self._create_patterns()
+
+#     def __getitem__(self, idx):
+#         pattern = self.patterns[idx] 
+#         index = self.indices[idx] 
+#         mask = self.masks[idx]      
+#         return index, mask, pattern
+    
+#     def __len__(self):
+#         return len(self.patterns)
+    
+#     def _get_disk_mask(self):
+
+#         res = (self.N, self.N)
         
-        return mask
-    
-    def _create_pattern(self):
-        gray=0
-        dim = int(self.num_of_px ** 0.5)
-        pattern = np.array([[gray for _ in range(dim)] for _ in range(dim)]).astype('uint8')
-        mask = self._random_partition()
-        pattern[mask] = 1
-        return mask, pattern
+#         mask_center = [res[0] // 2,res[1] // 2]
+#         X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
 
-    def _create_patterns(self):
-        patterns = []
-        masks = []
-        for i in range(self.N):
-            mask, pattern = self._create_pattern()
-            patterns.append(pattern)
-            masks.append(mask)
-        return masks, patterns
-    
-class OnePixelPatternGenerator2:
-    
-    def __init__(self, radius):
+#         # We generate a mask representing the disk we want to intensity to be concentrated in
+#         mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
         
-        self.radius = radius
-        self.N = 2 * radius
+#         return mask
     
-        self.random_idx = self._get_random_pixels()
-        self.indices, self.masks, self.patterns = self._create_patterns()
+#     def _get_random_pixels(self):
+#         """ creates all indices of a 2d matrix at a random order
+#             in order to later sample randomly the pixels of a given mask
+#         """
+#         disk = self._get_disk_mask()
+#         # this will be a list of tuples
+#         indices = []
+#         for i in np.arange(self.N):
+#             for j in np.arange(self.N):
+#                 if disk[i, j]:
+#                     indices.append((i, j)) # append a tuple to list
+# #         indices = np.vstack([disk.argmax(axis=0), np.arange(len(disk[0]))]).T[disk.sum(0) > 0]
 
-    def __getitem__(self, idx):
-        pattern = self.patterns[idx] 
-        index = self.indices[idx] 
-        mask = self.masks[idx]      
-        return index, mask, pattern
+#         # to array        
+#         indices = np.array(indices)
+
+#         # randomize
+#         rng = np.random.default_rng()
+#         rng.shuffle(indices)
+
+#         return indices
     
-    def __len__(self):
-        return len(self.patterns)
-    
-    def _get_disk_mask(self):
-
-        res = (self.N, self.N)
-        
-        mask_center = [res[0] // 2,res[1] // 2]
-        X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
-
-        # We generate a mask representing the disk we want to intensity to be concentrated in
-        mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
-        
-        return mask
-    
-    def _get_random_pixels(self):
-        """ creates all indices of a 2d matrix at a random order
-            in order to later sample randomly the pixels of a given mask
-        """
-        disk = self._get_disk_mask()
-        # this will be a list of tuples
-        indices = []
-        for i in np.arange(self.N):
-            for j in np.arange(self.N):
-                if disk[i, j]:
-                    indices.append((i, j)) # append a tuple to list
-#         indices = np.vstack([disk.argmax(axis=0), np.arange(len(disk[0]))]).T[disk.sum(0) > 0]
-
-        # to array        
-        indices = np.array(indices)
-
-        # randomize
-        rng = np.random.default_rng()
-        rng.shuffle(indices)
-
-        return indices
-    
-    def _create_patterns(self):
-        """ creates a series of one-pixel 2d pattern by using the random indices from 
-            _get_random_pixels
-        """
-        gray = 0
-        phi = 1
-        patterns = []
-        indices = []
-        masks = []
-        for i, j in self.random_idx:
-            mask = np.zeros(self.N ** 2, dtype=bool )
-            new_dim = int(self.N)
-            mask = mask.reshape(new_dim, new_dim)
+#     def _create_patterns(self):
+#         """ creates a series of one-pixel 2d pattern by using the random indices from 
+#             _get_random_pixels
+#         """
+#         gray = 0
+#         phi = 1
+#         patterns = []
+#         indices = []
+#         masks = []
+#         for i, j in self.random_idx:
+#             mask = np.zeros(self.N ** 2, dtype=bool )
+#             new_dim = int(self.N)
+#             mask = mask.reshape(new_dim, new_dim)
             
-            zero_pattern = np.array([[gray for _ in range(self.N)] for _ in range(self.N)]).astype('uint8')
-            temp = zero_pattern
-            temp[i, j] = phi
-            mask[i, j] = 1
-            patterns.append(temp)
-            indices.append((i, j))
-            masks.append(mask)
+#             zero_pattern = np.array([[gray for _ in range(self.N)] for _ in range(self.N)]).astype('uint8')
+#             temp = zero_pattern
+#             temp[i, j] = phi
+#             mask[i, j] = 1
+#             patterns.append(temp)
+#             indices.append((i, j))
+#             masks.append(mask)
             
-        return indices, masks, patterns
+#         return indices, masks, patterns
     
     
 class OnePixelPatternGenerator:
@@ -576,6 +517,70 @@ class OnePixelPatternGenerator:
             masks.append(mask)
             
         return indices, masks, patterns
+    
+    
+class RandomPatternGenerator:
+    
+    def __init__(self, num_of_patterns, slm_segments):
+        
+        disk_diameter = int(slm_segments ** 0.5)
+        self.radius = disk_diameter // 2
+        self.M = disk_diameter
+
+        self.N = num_of_patterns
+    
+        self.masks, self.patterns = self._create_patterns()
+
+    def __getitem__(self, idx):
+        pattern = self.patterns[idx]
+        mask = self.masks[idx]        
+        return mask, pattern
+    
+    def __len__(self):
+        return len(self.patterns)
+    
+    def _get_disk_mask(self):
+
+        res = (self.M, self.M)
+        mask_center = [res[0] // 2,res[1] // 2]
+        X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
+
+        # We generate a mask representing the disk we want to intensity to be concentrated in
+        mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
+
+        return mask
+    
+    def _random_partition(self):
+        """
+        """
+        mask = np.zeros(self.M ** 2, dtype=bool)
+        mask[:int((self.M ** 2) / 2)] = 1
+        np.random.shuffle(mask)
+        
+        new_dim = int(self.M)
+        mask = mask.reshape(new_dim, new_dim)
+        
+        return mask
+    
+    def _create_pattern(self):
+        disk = self._get_disk_mask()
+        gray = 0
+        dim = int(self.M)
+        pattern = np.array([[gray for _ in range(dim)] for _ in range(dim)]).astype('uint8')
+        mask = self._random_partition()
+        pattern[mask] = 1
+
+        return mask * disk, pattern * disk
+    
+
+    def _create_patterns(self):
+        patterns = []
+        masks = []
+        for i in range(self.N):
+            mask, pattern = self._create_pattern()
+            patterns.append(pattern)
+            masks.append(mask)
+        return masks, patterns
     
 
 class HadamardPatternGenerator:

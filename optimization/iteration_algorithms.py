@@ -280,8 +280,58 @@ class StepwiseSequential(IterationAlgos):
     
 class RandomPartition(IterationAlgos):
     
-    def run():
-        pass
+        
+    def run(self):
+        
+        gray = 0
+        self.final_pattern = np.array([[gray for _ in range(self.N)] for _ in range(self.N)]).astype('uint8')
+        
+        self.cost = []
+        counter = 0
+        self.frames = {}
+
+        for iteration in range(1, self.total_iterations+1):   
+             
+            # sweep each slm pixel
+            with tqdm(self.pattern_loader) as pat_epoch:
+                for mask, _ in pat_epoch:
+                    temp_pattern = self.final_pattern.copy()
+                    plt.figure()
+                    plt.imshow(temp_pattern)
+                    plt.colorbar()
+                    corr = []
+                    # sweep phase at each pixel
+                    for k in np.arange(0, self.m):
+                        # create pattern, i.e one pattern for each phase value
+                        temp = self.create_pattern(k, mask, temp_pattern)
+
+                        # upload pattern to slm
+                        self.upload_pattern(temp)
+
+                        # get interferogram from camera
+                        frame = self.get_frame()
+
+                        # calculate correlation here
+                        corr_k = self.callback(frame)
+                        corr.append(corr_k)
+
+                    counter += 1 
+                    self.frames[counter] = frame
+
+                    # update pattern with max corr
+                    self.cost.append(np.max(corr))
+                    self.final_pattern[mask] = self.phi_k(np.argmax(corr))
+                    print(self.phi_k(np.argmax(corr)))
+
+                    # print out status message
+                    descr = [f"Iteration #: {iteration}",
+                               f"Pattern #: {counter}"]
+                    pat_epoch.set_description(' | '.join(descr))
+                    pat_epoch.set_postfix(Cost=np.max(corr))
+                    pat_epoch.refresh()
+
+
+        return self.final_pattern, self.cost, self.frames
     
 class HadamardPartition(IterationAlgos):
     
