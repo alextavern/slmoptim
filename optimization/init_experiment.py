@@ -46,7 +46,6 @@ class InitExperiment():
         -------
         roi (tuple or int)
         """
-        print()
         if type(self.roi_size) is tuple:
             width, height = self.roi_size
         else:

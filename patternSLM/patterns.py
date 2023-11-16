@@ -362,82 +362,7 @@ class Pattern:
         
 
     
-# class OnePixelPatternGenerator2:
-    
-#     def __init__(self, radius):
-        
-#         self.radius = radius
-#         self.N = 2 * radius
-    
-#         self.random_idx = self._get_random_pixels()
-#         self.indices, self.masks, self.patterns = self._create_patterns()
 
-#     def __getitem__(self, idx):
-#         pattern = self.patterns[idx] 
-#         index = self.indices[idx] 
-#         mask = self.masks[idx]      
-#         return index, mask, pattern
-    
-#     def __len__(self):
-#         return len(self.patterns)
-    
-#     def _get_disk_mask(self):
-
-#         res = (self.N, self.N)
-        
-#         mask_center = [res[0] // 2,res[1] // 2]
-#         X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
-
-#         # We generate a mask representing the disk we want to intensity to be concentrated in
-#         mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
-        
-#         return mask
-    
-#     def _get_random_pixels(self):
-#         """ creates all indices of a 2d matrix at a random order
-#             in order to later sample randomly the pixels of a given mask
-#         """
-#         disk = self._get_disk_mask()
-#         # this will be a list of tuples
-#         indices = []
-#         for i in np.arange(self.N):
-#             for j in np.arange(self.N):
-#                 if disk[i, j]:
-#                     indices.append((i, j)) # append a tuple to list
-# #         indices = np.vstack([disk.argmax(axis=0), np.arange(len(disk[0]))]).T[disk.sum(0) > 0]
-
-#         # to array        
-#         indices = np.array(indices)
-
-#         # randomize
-#         rng = np.random.default_rng()
-#         rng.shuffle(indices)
-
-#         return indices
-    
-#     def _create_patterns(self):
-#         """ creates a series of one-pixel 2d pattern by using the random indices from 
-#             _get_random_pixels
-#         """
-#         gray = 0
-#         phi = 1
-#         patterns = []
-#         indices = []
-#         masks = []
-#         for i, j in self.random_idx:
-#             mask = np.zeros(self.N ** 2, dtype=bool )
-#             new_dim = int(self.N)
-#             mask = mask.reshape(new_dim, new_dim)
-            
-#             zero_pattern = np.array([[gray for _ in range(self.N)] for _ in range(self.N)]).astype('uint8')
-#             temp = zero_pattern
-#             temp[i, j] = phi
-#             mask[i, j] = 1
-#             patterns.append(temp)
-#             indices.append((i, j))
-#             masks.append(mask)
-            
-#         return indices, masks, patterns
     
     
 class OnePixelPatternGenerator:
@@ -656,16 +581,16 @@ class GaussPatternGenerator:
         self.patterns = self._create_patterns()
     
     def __getitem__(self, idx):
-        amp, phi = self.patterns[idx]    
+        phi = self.patterns[idx]    
         phi = self._gauss_int2phase(phi)
-        return amp, phi
+        return phi
     
     def __len__(self):
         return len(self.patterns)
     
     def _gauss_int2phase(self, vector):
         """
-        replaces the elements of an hadamard vector (-1, 1) with the useful slm values (0, pi)
+        replaces the elements of the gaussian phase (0, 3.14) with the useful slm values (0, grayscale)
         one needs to know the grayscale value of the slm that gives a phase shift of pi
         Parameters
         ----------
@@ -676,9 +601,9 @@ class GaussPatternGenerator:
         vector: 2d array
 
         """
-        vector[vector == -1] = 0     # phi = 0
-        vector[vector == 1] = self.calib_px / 2  # phi = pi
-        return vector
+
+        return vector * self.calib_px / np.pi
+
     
     def _create_sorted_indices(self):
         """ Create a a list of sorted 2d indices in order to generate
@@ -707,7 +632,7 @@ class GaussPatternGenerator:
         indices = self._create_sorted_indices()
         for n, m in indices:
                 F = GaussBeam(F, self.w0, LG=self.LG, n=m, m=n)
-                Amp = Intensity(0, F)
+                # Amp = Intensity(0, F)
                 Phi = Phase(F)
-                patterns.append((Amp, Phi))
+                patterns.append(Phi)
         return patterns
