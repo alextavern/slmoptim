@@ -178,17 +178,16 @@ class measTM:
         else:
             filepath = filename
         
-        print(filepath)
-
         with open(filepath, 'wb') as fp:
             pickle.dump((self.frames), fp)
         
         
 
-class calcTM:
+class calcTM(measTM):
 
-    def __init__(self, data):
+    def __init__(self, data, loader=None):
         self.data = data
+        self.loader = loader
     
     @staticmethod
     def four_phases_method(intensities):
@@ -272,21 +271,40 @@ class calcTM:
         # tm_fil = np.dot(norm_factors, self.tm_obs)
         return tm_fil
     
-    def _had2canonical(self, matrix):
+    def _had2canonical(self):
         """ Perform a basis change: from the hadamard to the canonical one
             by calculating the dot product between the measured TM and the hadamard
             matrix on which the basis is created
         """
         _, _, slm_px_len, _ = self._calc_dim()
         h = hadamard(slm_px_len)
-        tm_can = np.dot(matrix, h)
-        return tm_can
+        # tm_can = np.dot(matrix, h)
+        return h
 
-    def calc_plot_tm(self, figsize=(10, 5)):
+    def _change_to_canonical_basis(self, matrix, loader):
         
+        if loader:
+            passage = []
+            # here we iterate through every vector in the loader, 
+            # each vector is flattened and added as a row in the 
+            # passage matrix
+            for vector in loader:
+                passage.append(vector.flatten())
+            passage = np.array(passage)
+        else:
+            passage = self._had2canonical()
+            
+        # perform the basis change
+        tm_can = np.dot(matrix, passage)
+        
+        return tm_can
+    
+    def calc_plot_tm(self, figsize=(10, 5)):
+    
         tm_obs = self._calc_obs()
         tm_fil = self._normalize()
-        tm = self._had2canonical(tm_fil)
+        # tm = self._had2canonical(tm_fil)
+        tm = self._change_to_canonical_basis(tm_fil, self.loader)
         
         fig, axs = plt.subplots(nrows=1, ncols=3, sharex=True, sharey=True, figsize=figsize)
         

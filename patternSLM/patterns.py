@@ -561,6 +561,73 @@ class HadamardPatternGenerator:
         patterns = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
         
         return patterns
+
+class PlaneWaveGenerator:
+    
+    def __init__(self, num_of_pixels, calib_px, krange=(1, 20, 1), phistep=20):
+
+            self.N = num_of_pixels
+            self.calib_px = calib_px
+            
+            self.degrees = np.pi / 180
+
+            x0 = np.linspace(0, self.N, self.N)
+            y0 = np.linspace(0, self.N, self.N)
+            self.X, self.Y = np.meshgrid(x0, y0)
+
+            self.krange1, self.krange2, self.kstep = krange
+            self.phistep = phistep
+                 
+            self.patterns = self._create_patterns()
+            
+    def __getitem__(self, idx):
+        item = self.patterns[idx]
+        return item
+    
+    def __len__(self):
+        return len(self.patterns)
+    
+    def _plane_wave(self, k, r=1, theta=1 , phi=90 , z0=0):
+        """ Generates a 2d plane wave using spherical coordinates.
+
+        Parameters:
+            k (float): wavenumber
+            r (float): maximum amplitude
+            theta (float): angle in radians
+            phi (float): angle in radians
+            z0 (float): constant value for phase shift
+
+        Returns:
+            wave (complex): complex field
+        """
+    #     k = 2 * pi / wavelength
+        theta = theta * self.degrees
+        phi = phi * self.degrees
+        wave = r * np.exp(1.j * k *
+                         (self.X * np.sin(theta) * np.cos(phi) +
+                          self.Y * np.sin(theta) * np.sin(phi) + z0 * np.cos(theta)))
+        return wave
+
+    def _get_phase(self, wave):
+        arg = np.angle(wave, deg=False)
+        arg2pi = arg + np.pi
+        arg2SLM = arg2pi * self.calib_px / (2 * np.pi)
+
+        return arg2SLM.astype('uint8')
+    
+    def _create_patterns(self):
+        patterns = []
+        
+        k1 = self.krange1
+        k2 = self.krange2
+        step = self.kstep
+                 
+        for k in range(k1, k2, step):
+            for angle in np.arange(0, 360, self.phistep):
+                pattern = self._plane_wave(k=k, phi=angle)
+                pattern = self._get_phase(pattern)
+                patterns.append(pattern)
+        return patterns
         
 class GaussPatternGenerator:
     
