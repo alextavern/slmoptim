@@ -1,5 +1,5 @@
 import threading
-from .patterns import Pattern
+from ..loader.patterns import Pattern
 from tqdm.auto import tqdm
 import numpy as np
 import time, cv2

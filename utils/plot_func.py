@@ -2,9 +2,14 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from slmPy import slmpy
 from ..zeluxPy import helper_functions as cam
 import matplotlib.pyplot as plt
-from ..patternSLM import patterns as  pt
+from ..loader import patterns as  pt
 import numpy as np
 import time
+from scipy import ndimage
+import numpy as np
+from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
+
+
 
 
 def check(slm, camera, 

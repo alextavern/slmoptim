@@ -1,6 +1,3 @@
-from scipy import ndimage
-import numpy as np
-from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
 def set_roi(roi_size, roi_off):
     offset_x, offset_y = roi_off
@@ -178,5 +175,3 @@ class Cam:
 
                 camera.disarm()
             return frame
-
-

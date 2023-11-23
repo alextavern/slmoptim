@@ -1,5 +1,5 @@
-from ..patternSLM import patterns as pt
-from ..patternSLM import upload as up
+from ..loader import patterns as pt
+from ..utils import upload as up
 from ..zeluxPy import helper_functions as cam
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from slmPy import slmpy

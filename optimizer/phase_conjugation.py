@@ -1,5 +1,5 @@
 import numpy as np
-from ..patternSLM import patterns as pt
+from ..loader import patterns as pt
 
 class Target:
     def __init__(self, shape) -> None:
