@@ -648,9 +648,9 @@ class GaussPatternGenerator:
         self.patterns = self._create_patterns()
     
     def __getitem__(self, idx):
-        phi = self.patterns[idx]    
+        amp, phi = self.patterns[idx]    
         phi = self._gauss_int2phase(phi)
-        return phi
+        return amp, phi
     
     def __len__(self):
         return len(self.patterns)
@@ -699,7 +699,7 @@ class GaussPatternGenerator:
         indices = self._create_sorted_indices()
         for n, m in indices:
                 F = GaussBeam(F, self.w0, LG=self.LG, n=m, m=n)
-                # Amp = Intensity(0, F)
+                Amp = Intensity(0, F)
                 Phi = Phase(F)
-                patterns.append(Phi)
+                patterns.append((Amp, Phi))
         return patterns
