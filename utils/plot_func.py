@@ -1,6 +1,6 @@
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from slmPy import slmpy
-from ..zeluxPy import helper_functions as cam
+from ..utils import camera_func as cam
 import matplotlib.pyplot as plt
 from ..loader import patterns as  pt
 import numpy as np
@@ -12,14 +12,14 @@ from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
 
 
-def check(slm, camera, 
-          N, ij, slm_macropix, 
+def pattern2interferogram(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600), 
           remote=True, 
           norm=False):
     
-    resX, resY = (800, 600)
-    slm_patterns = pt.Pattern(resX, resY)
-    _, pattern = slm_patterns.hadamard_pattern(N, ij, n=slm_macropix, gray=0)
+    resX, resY = slm_resolution
+    slm_patterns = pt.PatternsBacic(resX, resY)
+    pattern = slm_patterns.pattern_to_SLM(pattern, n=slm_macropixel)
+    # _, pattern = slm_patterns.hadamard_pattern(N, ij, n=slm_macropix, gray=0)
     
     if remote:
         slm.sendArray(pattern)

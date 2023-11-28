@@ -14,7 +14,7 @@ A class that creates various patterns to be uploaded to an SLM:
 5/ a series of methods that create a hadamard vector pattern
 """
 
-class Pattern:
+class PatternsBacic:
 
     def __init__(self, res_x, res_y, grayphase=112):
         """
@@ -147,26 +147,26 @@ class Pattern:
 
         return pattern.astype('uint8')
 
-    @staticmethod
-    def _get_hadamard_basis(dim):
-        """
-        calculates the outer product of all combination of the rows of a hadamard matrix of a given order to
-        generate 2d patterns that constitute a hadamard basis.
-        Parameters
-        ----------
-        dim: the dimensions of each basis vector dim x dim (int)
+    # @staticmethod
+    # def _get_hadamard_basis(dim):
+    #     """
+    #     calculates the outer product of all combination of the rows of a hadamard matrix of a given order to
+    #     generate 2d patterns that constitute a hadamard basis.
+    #     Parameters
+    #     ----------
+    #     dim: the dimensions of each basis vector dim x dim (int)
 
-        Returns
-        -------
-        matrices: all the 2d patterns (array)
+    #     Returns
+    #     -------
+    #     matrices: all the 2d patterns (array)
 
-        """
+    #     """
         
-        order = int((np.log2(dim)))
+    #     order = int((np.log2(dim)))
 
-        h = hadamard(2 ** order)
-        matrices = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
-        return matrices
+    #     h = hadamard(2 ** order)
+    #     matrices = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
+    #     return matrices
 
     @staticmethod
     def _get_hadamard_vector(order, i, j):
@@ -245,7 +245,7 @@ class Pattern:
 
         return hadamard_vector, pattern.astype('uint8')
 
-    def enlarge_to_SLM(self, vector, n=1, gray=0):
+    def pattern_to_SLM(self, vector, n=1, gray=0):
         """
         puts an enlarged vector in the middle of the slm screen
         
@@ -269,7 +269,7 @@ class Pattern:
           # enlarge vector by "macropixeling"
         vector = self._enlarge_pattern(vector, n)
         # replace values to grayscale-phase values
-        vector = self._hadamard_int2phase(vector)
+        # vector = self._hadamard_int2phase(vector)
 
         # put it in the middle of the slm screen
         # first calculate offsets from the image center
@@ -295,31 +295,31 @@ class Pattern:
         return pattern.astype('uint8')
 
 
-    def add_subpattern(self, subpattern, gray=0):
-        """_summary_
+    # def add_subpattern(self, subpattern, gray=0):
+    #     """_summary_
 
-        Args:
-            subpattern (_type_): _description_
-            gray (int, optional): _description_. Defaults to 0.
+    #     Args:
+    #         subpattern (_type_): _description_
+    #         gray (int, optional): _description_. Defaults to 0.
 
-        Returns:
-            _type_: _description_
-        """
-        # create a 2d array
-        rows = self.res_x
-        cols = self.res_y
-        # make sure that the image is composed by 8bit integers between 0 and 255
-        pattern = np.full(shape=(cols, rows), fill_value=gray).astype('uint8')
+    #     Returns:
+    #         _type_: _description_
+    #     """
+    #     # create a 2d array
+    #     rows = self.res_x
+    #     cols = self.res_y
+    #     # make sure that the image is composed by 8bit integers between 0 and 255
+    #     pattern = np.full(shape=(cols, rows), fill_value=gray).astype('uint8')
         
-        # put it in the middle of the slm screen
-        # first calculate offsets from the image center
-        subpattern_dim = subpattern.shape
-        offset_x = int(rows / 2 - subpattern_dim[0] / 2)
-        offset_y = int(cols / 2 - subpattern_dim[1] / 2)
-        # and then add the vector in the center of the initialized pattern
-        pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = subpattern
+    #     # put it in the middle of the slm screen
+    #     # first calculate offsets from the image center
+    #     subpattern_dim = subpattern.shape
+    #     offset_x = int(rows / 2 - subpattern_dim[0] / 2)
+    #     offset_y = int(cols / 2 - subpattern_dim[1] / 2)
+    #     # and then add the vector in the center of the initialized pattern
+    #     pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = subpattern
 
-        return pattern.astype('uint8')
+    #     return pattern.astype('uint8')
         
     @staticmethod
     def _enlarge_pattern(matrix, n):
@@ -344,10 +344,10 @@ class Pattern:
 
         return matrix
     
-    def pattern2SLM(self, pattern, n):
-        temp = self._enlarge_pattern(pattern, n)
-        temp = self.add_subpattern(temp)
-        return temp
+    # def pattern2SLM(self, pattern, n):
+    #     temp = self._enlarge_pattern(pattern, n)
+    #     temp = self.add_subpattern(temp)
+    #     return temp
     
     def correct_aberrations(self, correction, pattern, alpha=0.5):
 
@@ -361,10 +361,6 @@ class Pattern:
     
         
 
-    
-
-    
-    
 class OnePixelPatternGenerator:
     
     def __init__(self, slm_segments):

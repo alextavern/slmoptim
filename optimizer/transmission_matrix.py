@@ -1,6 +1,6 @@
 from ..loader import patterns as pt
 from ..utils import upload as up
-from ..zeluxPy import helper_functions as cam
+from ..utils import download as down
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from slmPy import slmpy
 from scipy.linalg import hadamard
@@ -83,7 +83,7 @@ class measTM:
                                             slm_macropixel_size=self.slm_macropixel_size,
                                             path=self.corr_path)
 
-        download_thread = cam.FrameAcquisitionThread(self.camera,
+        download_thread = down.FrameAcquisitionThread(self.camera,
                                                      download_frame_event, 
                                                      upload_pattern_event, 
                                                      stop_all_event,
@@ -125,14 +125,14 @@ class measTM:
         self.frames = []
         
         resX, resY = (800, 600)
-        slm_patterns = pt.Pattern(resX, resY)
+        slm_patterns = pt.PatternsBacic(resX, resY)
 
 
         # loop through each 2d vector of the loaded basis
         for vector in tqdm(self.pattern_loader, desc="Uploading pattern vectors", leave=True):
             # and for each vector load the four reference phases
             for phase in four_phases:
-                pattern = slm_patterns.enlarge_to_SLM(vector, self.slm_macropixel_size, phase)
+                pattern = slm_patterns.pattern_to_SLM(vector, self.slm_macropixel_size, phase)
                 if self.remote:
                     self.slm.sendArray(pattern)
                 else:

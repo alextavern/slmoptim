@@ -1,8 +1,11 @@
+#!/usr/bin/env python
+
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.fftpack as sfft
 from scipy import optimize
-from slmOptim.zeluxPy.helper_functions import get_interferogram
+from ..utils.camera_func import get_interferogram
 import time, os
 
 def hist(array):

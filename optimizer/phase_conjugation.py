@@ -122,6 +122,6 @@ class InverseLight:
             phase_mask[ij[0], ij[1]] = arg2SLM[idx]
             
         # enlarge pattern for the SLM macropixels
-        self.phase_mask_enlarged = pt.Pattern._enlarge_pattern(phase_mask, self.phase_mask_mag)
+        self.phase_mask_enlarged = pt.PatternsBacic._enlarge_pattern(phase_mask, self.phase_mask_mag)
         
         return self.phase_mask_enlarged

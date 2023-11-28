@@ -1,5 +1,5 @@
 import threading
-from ..loader.patterns import Pattern
+from ..loader import patterns as pt
 from tqdm.auto import tqdm
 import numpy as np
 import time, cv2
@@ -38,7 +38,7 @@ class SlmUploadPatternsThread(threading.Thread):
         self.slm_macropixel_size = slm_macropixel_size
         self.length = num_in
         
-        self.slm_patterns = Pattern(self.resX, self.resY, calib_px)
+        self.slm_patterns = pt.PatternsBasic(self.resX, self.resY, calib_px)
         self.basis = self.slm_patterns._get_hadamard_basis(self.num_in)
         
         self.path = path
