@@ -360,14 +360,39 @@ class PatternsBacic:
         return pattern.astype('uint8')
     
         
-
-class OnePixelPatternGenerator:
-    
-    def __init__(self, slm_segments):
+class BasePatternGenerator:
+    def __init__(self, num_of_segments, num_of_patterns):
         
-        disk_diameter = int(slm_segments ** 0.5)
-        self.radius = disk_diameter // 2
-        self.N = disk_diameter
+        self.N = num_of_patterns
+        self.M = num_of_segments
+        self.disk_diameter = int(num_of_segments ** 0.5)
+        self.radius = self.disk_diameter // 2
+    
+    def _get_disk_mask(self):
+
+        res = (self.disk_diameter, self.disk_diameter)
+        
+        mask_center = [res[0] // 2,res[1] // 2]
+        X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
+
+        # We generate a mask representing the disk we want to intensity to be concentrated in
+        mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
+        
+        return mask
+    
+    def __getitem__(self, idx):
+        phi = self.patterns[idx]    
+        return phi
+    
+    def __len__(self):
+        return len(self.patterns)
+    
+class OnePixelPatternGenerator(BasePatternGenerator):
+    
+    def __init__(self, num_of_segments):
+        
+        self.disk_diameter = int(num_of_segments ** 0.5)
+        self.radius = self.disk_diameter // 2
     
         self.random_idx = self._get_random_pixels()
         self.indices, self.masks, self.patterns = self._create_patterns()
@@ -383,7 +408,7 @@ class OnePixelPatternGenerator:
     
     def _get_disk_mask(self):
 
-        res = (self.N, self.N)
+        res = (self.disk_diameter, self.disk_diameter)
         
         mask_center = [res[0] // 2,res[1] // 2]
         X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
@@ -429,7 +454,7 @@ class OnePixelPatternGenerator:
             new_dim = int(self.N)
             mask = mask.reshape(new_dim, new_dim)
             
-            zero_pattern = np.array([[gray for _ in range(self.N)] for _ in range(self.N)]).astype('uint8')
+            zero_pattern = np.array([[gray for _ in range(self.disk_diameter)] for _ in range(self.disk_diameter)]).astype('uint8')
             temp = zero_pattern
             temp[i, j] = phi
             mask[i, j] = 1
@@ -444,9 +469,9 @@ class RandomPatternGenerator:
     
     def __init__(self, num_of_patterns, slm_segments):
         
-        disk_diameter = int(slm_segments ** 0.5)
-        self.radius = disk_diameter // 2
-        self.M = disk_diameter
+        self.disk_diameter = int(slm_segments ** 0.5)
+        self.radius = self.disk_diameter // 2
+        self.M = self.disk_diameter
 
         self.N = num_of_patterns
     
@@ -630,18 +655,24 @@ class SphericalWavesGenerator(PlaneWaveGenerator):
         
 class GaussPatternGenerator:
     
-    def __init__(self, N, num=16, LG=True,
+    def __init__(self, number_of_segments=256, number_of_patterns=16, LG=True,
                  w0=3e-3, 
                  wavelength=632e-9, 
                  size=15e-3, 
                  slm_calibration_px=112):
         
-        self.N = N  # number of pixles
+        self.disk_diameter = int(number_of_segments ** 0.5)
+        self.radius = self.disk_diameter // 2
+
+        self.N = number_of_patterns
+    
+        self.masks, self.patterns = self._create_patterns()
+        
+        self.M = number_of_segments  # number of pixles
         self.w0 = w0 # waist
         self.wavelength = wavelength # wavelenght
         self.size = size 
         self.LG = LG # Hermite-Gauss or Laguerre Gauss
-        self.num = num # number of vectors
         self.calib_px = slm_calibration_px
         
         self.patterns = self._create_patterns()
@@ -680,11 +711,22 @@ class GaussPatternGenerator:
         a list of lists
         """
         indices = []
-        for n in range(self.num):
-            for m in range(self.num):
+        for n in range(self.N):
+            for m in range(self.N):
                 indices.append([n, m])
         return sorted(indices, key=sum)
-    
+
+    def _get_disk_mask(self):
+
+        res = (self.disk_diameter, self.disk_diameter)
+        mask_center = [res[0] // 2,res[1] // 2]
+        X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
+
+        # We generate a mask representing the disk we want to intensity to be concentrated in
+        mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
+
+        return mask                                                 
+        
     def _create_patterns(self):
         """ Uses LightPipe library to create HG or LG patterns
 
@@ -692,13 +734,17 @@ class GaussPatternGenerator:
         -------
             a list with all created patterns
         """
+        disk = self._get_disk_mask()
+
         patterns = []
         
-        F = Begin(self.size, self.wavelength, self.N)
+        F = Begin(self.size, self.wavelength, self.M)
         indices = self._create_sorted_indices()
         for n, m in indices:
                 F = GaussBeam(F, self.w0, LG=self.LG, n=m, m=n)
                 amp = Intensity(0, F)
                 # phi = Phase(F)
                 patterns.append(amp)
-        return patterns
+                
+        return patterns * disk
+    
