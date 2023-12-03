@@ -583,7 +583,7 @@ class PlaneWaveGenerator:
     def __len__(self):
         return len(self.patterns)
     
-    def _plane_wave(self, k, r=1, theta=1 , phi=90 , z0=0):
+    def _get_wave(self, k, r=1, theta=1 , phi=90 , z0=0):
         """ Generates a 2d plane wave using spherical coordinates.
 
         Parameters:
@@ -620,10 +620,13 @@ class PlaneWaveGenerator:
                  
         for k in range(k1, k2, step):
             for angle in np.arange(0, 360, self.phistep):
-                pattern = self._plane_wave(k=k, phi=angle)
+                pattern = self._get_wave(k=k, phi=angle)
                 pattern = self._get_phase(pattern)
                 patterns.append(pattern)
         return patterns
+    
+class SphericalWavesGenerator(PlaneWaveGenerator):
+    pass
         
 class GaussPatternGenerator:
     
@@ -645,7 +648,7 @@ class GaussPatternGenerator:
     
     def __getitem__(self, idx):
         phi = self.patterns[idx]    
-        phi = self._gauss_int2phase(phi)
+        # phi = self._gauss_int2phase(phi) 
         return phi
     
     def __len__(self):
@@ -695,7 +698,7 @@ class GaussPatternGenerator:
         indices = self._create_sorted_indices()
         for n, m in indices:
                 F = GaussBeam(F, self.w0, LG=self.LG, n=m, m=n)
-                # Amp = Intensity(0, F)
-                Phi = Phase(F)
-                patterns.append(Phi)
+                amp = Intensity(0, F)
+                # phi = Phase(F)
+                patterns.append(amp)
         return patterns

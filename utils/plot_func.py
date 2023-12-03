@@ -5,21 +5,14 @@ import matplotlib.pyplot as plt
 from ..loader import patterns as  pt
 import numpy as np
 import time
-from scipy import ndimage
-import numpy as np
-from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
-
-
-
-def pattern2interferogram(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600), 
+def pattern_frame(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600), 
           remote=True, 
           norm=False):
     
     resX, resY = slm_resolution
     slm_patterns = pt.PatternsBacic(resX, resY)
     pattern = slm_patterns.pattern_to_SLM(pattern, n=slm_macropixel)
-    # _, pattern = slm_patterns.hadamard_pattern(N, ij, n=slm_macropix, gray=0)
     
     if remote:
         slm.sendArray(pattern)
@@ -51,7 +44,8 @@ def pattern2interferogram(slm, camera, pattern, slm_macropixel, slm_resolution=(
     
     return pattern, frame
 
-def plot_focus(frame1, frame2, norm=True):
+
+def two_frames(frame1, frame2, norm=True):
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 10), sharex=True, sharey=True)
     if norm:

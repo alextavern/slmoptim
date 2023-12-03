@@ -3,7 +3,7 @@ import time, os
 import pickle
 from tqdm.auto import tqdm
 from tqdm import trange
-from slmOptim.patternSLM import patterns as pt
+from ..loader import patterns as pt
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from aotools.functions import phaseFromZernikes

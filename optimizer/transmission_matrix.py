@@ -299,6 +299,45 @@ class calcTM(measTM):
         
         return tm_can
     
+    def calc(self):
+    
+        self.tm_obs = self._calc_obs()
+        self.tm_fil = self._normalize()
+        # tm = self._had2canonical(tm_fil)
+        self.tm = self._change_to_canonical_basis(self.tm_fil, self.loader)
+        
+        return self.tm_obs, self.tm_fil, self.tm   
+    
+    def plot(self, figsize=(10, 5)):
+        
+        fig, axs = plt.subplots(nrows=1, ncols=3, sharex=True, sharey=True, figsize=figsize)
+            
+        obs = axs[0].imshow(abs(self.tm_obs), aspect='auto')
+        divider = make_axes_locatable(axs[0])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(obs, cax=cax)
+        
+        
+        fil = axs[1].imshow(abs(self.tm_fil), aspect='auto')
+        divider = make_axes_locatable(axs[1])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(fil, cax=cax)
+        
+        can = axs[2].imshow(abs(tm), aspect='auto')
+        divider = make_axes_locatable(axs[2])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(can, cax=cax)
+
+        axs[0].set_title("Hadamard TM")
+        axs[1].set_title("Filtered TM")
+        axs[2].set_title("Canonical TM")
+
+        fig.text(0.5, -0.01, 'slm pixels #', ha='center')
+        fig.text(-0.01, 0.5, 'camera pixels #', va='center', rotation='vertical')
+        fig.tight_layout()
+        
+        return fig
+    
     def calc_plot_tm(self, figsize=(10, 5)):
     
         tm_obs = self._calc_obs()
