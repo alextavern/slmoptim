@@ -3,6 +3,9 @@ import cv2
 from scipy import signal
 from scipy.linalg import hadamard
 from LightPipes import *
+from aotools.functions import zernike_noll
+from diffractio import degrees, mm, nm, um
+from diffractio.scalar_sources_XY import Scalar_source_XY
 import random
 
 """
@@ -359,7 +362,7 @@ class PatternsBacic:
         
         return pattern.astype('uint8')
     
-        
+
 class BasePatternGenerator:
     def __init__(self, num_of_segments, num_of_patterns):
         
@@ -373,50 +376,42 @@ class BasePatternGenerator:
         res = (self.disk_diameter, self.disk_diameter)
         
         mask_center = [res[0] // 2,res[1] // 2]
-        X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
+        X, Y = np.meshgrid(np.arange(res[0]), np.arange(res[1]))
 
         # We generate a mask representing the disk we want to intensity to be concentrated in
         mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
         
         return mask
     
+    @staticmethod
+    def _normalize(pattern, vmax=255):
+        pattern = (pattern - np.min(pattern)) / (np.max(pattern) - np.min(pattern)) * vmax
+        return pattern
+    
+    def _get_phase(self, wave, calib_px):
+        arg = np.angle(wave, deg=False)
+        arg2pi = arg + np.pi
+        arg2SLM = arg2pi * calib_px / (2 * np.pi)
+        arg2SLM = arg
+
+        return arg2SLM
+    
     def __getitem__(self, idx):
-        phi = self.patterns[idx]    
-        return phi
+        pattern = self.patterns[idx]    
+        return pattern
     
     def __len__(self):
         return len(self.patterns)
+    
+    
     
 class OnePixelPatternGenerator(BasePatternGenerator):
     
-    def __init__(self, num_of_segments):
-        
-        self.disk_diameter = int(num_of_segments ** 0.5)
-        self.radius = self.disk_diameter // 2
+    def __init__(self, num_of_segments=256):
+        super().__init__(num_of_segments, num_of_patterns=None)
     
         self.random_idx = self._get_random_pixels()
-        self.indices, self.masks, self.patterns = self._create_patterns()
-
-    def __getitem__(self, idx):
-        pattern = self.patterns[idx] 
-        index = self.indices[idx] 
-        mask = self.masks[idx]      
-        return index, mask, pattern
-    
-    def __len__(self):
-        return len(self.patterns)
-    
-    def _get_disk_mask(self):
-
-        res = (self.disk_diameter, self.disk_diameter)
-        
-        mask_center = [res[0] // 2,res[1] // 2]
-        X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
-
-        # We generate a mask representing the disk we want to intensity to be concentrated in
-        mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
-        
-        return mask
+        self.patterns = self._create_patterns()
     
     def _get_random_pixels(self):
         """ creates all indices of a 2d matrix at a random order
@@ -425,11 +420,10 @@ class OnePixelPatternGenerator(BasePatternGenerator):
         disk = self._get_disk_mask()
         # this will be a list of tuples
         indices = []
-        for i in np.arange(self.N):
-            for j in np.arange(self.N):
+        for i in np.arange(self.disk_diameter):
+            for j in np.arange(self.disk_diameter):
                 if disk[i, j]:
                     indices.append((i, j)) # append a tuple to list
-#         indices = np.vstack([disk.argmax(axis=0), np.arange(len(disk[0]))]).T[disk.sum(0) > 0]
 
         # to array        
         indices = np.array(indices)
@@ -450,8 +444,8 @@ class OnePixelPatternGenerator(BasePatternGenerator):
         indices = []
         masks = []
         for i, j in self.random_idx:
-            mask = np.zeros(self.N ** 2, dtype=bool )
-            new_dim = int(self.N)
+            mask = np.zeros(self.disk_diameter ** 2, dtype=bool )
+            new_dim = int(self.disk_diameter)
             mask = mask.reshape(new_dim, new_dim)
             
             zero_pattern = np.array([[gray for _ in range(self.disk_diameter)] for _ in range(self.disk_diameter)]).astype('uint8')
@@ -462,62 +456,38 @@ class OnePixelPatternGenerator(BasePatternGenerator):
             indices.append((i, j))
             masks.append(mask)
             
-        return indices, masks, patterns
+        return masks
     
-    
-class RandomPatternGenerator:
-    
-    def __init__(self, num_of_patterns, slm_segments):
-        
-        self.disk_diameter = int(slm_segments ** 0.5)
-        self.radius = self.disk_diameter // 2
-        self.M = self.disk_diameter
 
-        self.N = num_of_patterns
-    
-        self.masks, self.patterns = self._create_patterns()
+class RandomPatternGenerator(BasePatternGenerator):
 
-    def __getitem__(self, idx):
-        pattern = self.patterns[idx]
-        mask = self.masks[idx]        
-        return mask, pattern
-    
-    def __len__(self):
-        return len(self.patterns)
-    
-    def _get_disk_mask(self):
+    def __init__(self, num_of_segments, num_of_patterns, phase_range):
+        super().__init__(num_of_segments, num_of_patterns)
 
-        res = (self.M, self.M)
-        mask_center = [res[0] // 2,res[1] // 2]
-        X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
+        self.phase_range = phase_range
+        self.patterns = self._create_patterns()
 
-        # We generate a mask representing the disk we want to intensity to be concentrated in
-        mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
-
-        return mask
-    
     def _random_partition(self):
         """
         """
-        mask = np.zeros(self.M ** 2, dtype=bool)
-        mask[:int((self.M ** 2) / 2)] = 1
+        mask = np.zeros(self.M, dtype=bool)
+        mask[:int((self.M) / 2)] = 1
         np.random.shuffle(mask)
         
-        new_dim = int(self.M)
+        new_dim = int(self.M ** 0.5)
         mask = mask.reshape(new_dim, new_dim)
         
-        return mask
+        disk_mask = self._get_disk_mask()
+        
+        return mask * disk_mask
     
     def _create_pattern(self):
-        disk = self._get_disk_mask()
-        gray = 0
-        dim = int(self.M)
+        gray=0
+        dim = int(self.M ** 0.5)
         pattern = np.array([[gray for _ in range(dim)] for _ in range(dim)]).astype('uint8')
         mask = self._random_partition()
         pattern[mask] = 1
-
-        return mask * disk, pattern * disk
-    
+        return mask, pattern
 
     def _create_patterns(self):
         patterns = []
@@ -526,26 +496,24 @@ class RandomPatternGenerator:
             mask, pattern = self._create_pattern()
             patterns.append(pattern)
             masks.append(mask)
-        return masks, patterns
+        return masks
     
 
-class HadamardPatternGenerator:
+class HadamardPatternGenerator(BasePatternGenerator):
     
-    def __init__(self, num_of_pixels, calib_px):
+    def __init__(self, num_of_segments, calib_px):
+            super().__init__(num_of_segments, num_of_patterns=None)
 
-            self.num_of_px = num_of_pixels
             self.calib_px = calib_px
             self.patterns = self._create_patterns()
 
     def __getitem__(self, idx):
         item = self.patterns[idx]
-        item = self._hadamard_int2phase(item)        
-        return item
+        item = self._int2phase(item)        
+        return item.astype('uint8')
     
-    def __len__(self):
-        return len(self.patterns)
     
-    def _hadamard_int2phase(self, vector):
+    def _int2phase(self, vector):
         """
         replaces the elements of an hadamard vector (-1, 1) with the useful slm values (0, pi)
         one needs to know the grayscale value of the slm that gives a phase shift of pi
@@ -575,38 +543,170 @@ class HadamardPatternGenerator:
         patterns: all the 2d patterns (array)
 
         """
-        dim = int(self.num_of_px ** 0.5)
+        dim = int(self.M ** 0.5)
         order = int((np.log2(dim)))
 
         h = hadamard(2 ** order)
         patterns = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
         
         return patterns
+        
 
-class PlaneWaveGenerator:
+class GaussPatternGenerator(BasePatternGenerator):
     
-    def __init__(self, num_of_pixels, calib_px, krange=(1, 20, 1), phistep=20):
+    def __init__(self, 
+                 num_of_segments=256, 
+                 num_of_patterns=16, 
+                 LG=False,
+                 w0=3e-3, 
+                 wavelength=632e-9, 
+                 size=15e-3,
+                 phase=False,
+                 calib_px=112):
+        
+        super().__init__(num_of_segments, 
+                         num_of_patterns)
 
-            self.N = num_of_pixels
+        self.w0 = w0 # waist
+        self.wavelength = wavelength # wavelenght
+        self.size = size 
+        self.LG = LG # Hermite-Gauss or Laguerre Gauss
+        self.phase = phase
+        self.calib_px = calib_px
+        
+        self.patterns = self._create_patterns()
+
+    def _create_sorted_indices(self):
+        """ Create a a list of sorted 2d indices in order to generate
+            vectors with increased spatial frequency.
+
+        Returns
+        -------
+        a list of lists
+        """
+        indices = []
+        for n in range(self.N):
+            for m in range(self.N):
+                indices.append([n, m])
+        return sorted(indices, key=sum)                                               
+        
+    def _create_patterns(self):
+        """ Uses LightPipe library to create HG or LG patterns
+
+        Returns
+        -------
+            a list with all created patterns
+        """
+        disk = self._get_disk_mask()
+
+        patterns = []
+        
+        F = Begin(self.size, self.wavelength, int(self.M ** 0.5))
+        indices = self._create_sorted_indices()
+        for n, m in indices:
+                F = GaussBeam(F, self.w0, LG=self.LG, n=m, m=n)
+        
+                if self.phase:
+                    pattern = Phase(F)
+                    pattern = pattern * self.calib_px / (np.pi)
+                else:
+                    pattern = Intensity(0, F)
+#                     pattern = self._normalize(pattern, 112)
+        
+                patterns.append(pattern)
+                
+        return patterns
+    
+
+class LaguerrePatternGenerator(BasePatternGenerator):
+    
+    def __init__(self, 
+                num_of_segments=256, 
+                num_of_patterns=16,
+                waist=100,
+                phase=True,
+                slm_calibration_px=112):
+                
+        super().__init__(num_of_segments, 
+                        num_of_patterns)
+
+        self.phase = phase
+        self.w0 = waist * um
+        self.patterns = self._create_patterns()
+
+    def _create_patterns(self):
+        
+        patterns = []
+        
+        x0 = np.linspace(-1 * mm, 1 * mm, int(self.M ** 0.5))
+        y0 = np.linspace(-1 * mm, 1 * mm, int(self.M ** 0.5))
+        wavelength = 0.6238 * um
+        lg = Scalar_source_XY(x=x0, y=y0, wavelength=wavelength)
+        
+        for p in range(int(self.N ** 0.5) + 1):
+            for l in range(int(self.N ** 0.5) + 1):
+
+                lg.laguerre_beam(A=1,
+                                 n=p,
+                                 l=l,
+                                 r0=(0 * um, 0 * um),
+                                 w0=self.w0,
+                                 z0=0,
+                                 z=0.01 * um)
+                
+                patterns.append(abs(lg.u))
+
+        return patterns
+        
+
+class ZernikePatternGenerator(BasePatternGenerator):
+    def __init__(self, 
+                num_of_segments=256, 
+                num_of_patterns=16,
+                phase=True,
+                slm_calibration_px=112):
+                
+        super().__init__(num_of_segments, 
+                        num_of_patterns)
+
+        self.phase = phase
+        self.patterns = self._create_patterns()
+
+    def _create_patterns(self):
+        disk = self._get_disk_mask()
+        patterns = []
+
+        for idx in range(1, self.N + 2):
+            pattern = zernike_noll(idx, int(self.M ** 0.5))
+            if self.phase:
+                pattern = self._get_phase(pattern, 112)
+            else:
+#                 pattern = self._normalize(pattern, 112)
+                pass
+
+            patterns.append(pattern)
+
+        return patterns
+
+
+class PlaneWaveGenerator(BasePatternGenerator):
+    
+    def __init__(self, num_of_segments, calib_px=112, krange=(1, 20, 1), phistep=20):
+            super().__init__(num_of_segments, num_of_patterns=None)
+
             self.calib_px = calib_px
             
             self.degrees = np.pi / 180
 
-            x0 = np.linspace(0, self.N, self.N)
-            y0 = np.linspace(0, self.N, self.N)
+            x0 = np.linspace(0, self.M, self.M)
+            y0 = np.linspace(0, self.M, self.M)
             self.X, self.Y = np.meshgrid(x0, y0)
 
             self.krange1, self.krange2, self.kstep = krange
             self.phistep = phistep
                  
             self.patterns = self._create_patterns()
-            
-    def __getitem__(self, idx):
-        item = self.patterns[idx]
-        return item
-    
-    def __len__(self):
-        return len(self.patterns)
+
     
     def _get_wave(self, k, r=1, theta=1 , phi=90 , z0=0):
         """ Generates a 2d plane wave using spherical coordinates.
@@ -629,13 +729,6 @@ class PlaneWaveGenerator:
                           self.Y * np.sin(theta) * np.sin(phi) + z0 * np.cos(theta)))
         return wave
 
-    def _get_phase(self, wave):
-        arg = np.angle(wave, deg=False)
-        arg2pi = arg + np.pi
-        arg2SLM = arg2pi * self.calib_px / (2 * np.pi)
-
-        return arg2SLM.astype('uint8')
-    
     def _create_patterns(self):
         patterns = []
         
@@ -646,105 +739,39 @@ class PlaneWaveGenerator:
         for k in range(k1, k2, step):
             for angle in np.arange(0, 360, self.phistep):
                 pattern = self._get_wave(k=k, phi=angle)
-                pattern = self._get_phase(pattern)
+                pattern = self._get_phase(pattern, self.calib_px)
                 patterns.append(pattern)
         return patterns
     
-class SphericalWavesGenerator(PlaneWaveGenerator):
-    pass
-        
-class GaussPatternGenerator:
     
-    def __init__(self, number_of_segments=256, number_of_patterns=16, LG=True,
-                 w0=3e-3, 
-                 wavelength=632e-9, 
-                 size=15e-3, 
-                 slm_calibration_px=112):
-        
-        self.disk_diameter = int(number_of_segments ** 0.5)
-        self.radius = self.disk_diameter // 2
-
-        self.N = number_of_patterns
     
-        self.masks, self.patterns = self._create_patterns()
-        
-        self.M = number_of_segments  # number of pixles
-        self.w0 = w0 # waist
-        self.wavelength = wavelength # wavelenght
-        self.size = size 
-        self.LG = LG # Hermite-Gauss or Laguerre Gauss
-        self.calib_px = slm_calibration_px
-        
-        self.patterns = self._create_patterns()
+def superpose(loader, coeffs):
+    """ A simple function that creates a linear combination of given vectors
+
+    Args:
+        loader: pattern loader object
+        coeffs: a list with coefficients
+
+    Returns:
+        mask: a 2d array
+    """
+
+    shape = loader[1].shape
     
-    def __getitem__(self, idx):
-        phi = self.patterns[idx]    
-        # phi = self._gauss_int2phase(phi) 
-        return phi
-    
-    def __len__(self):
-        return len(self.patterns)
-    
-    def _gauss_int2phase(self, vector):
-        """
-        replaces the elements of the gaussian phase (0, 3.14) with the useful slm values (0, grayscale)
-        one needs to know the grayscale value of the slm that gives a phase shift of pi
-        Parameters
-        ----------
-        vector: 2d array
+    # create array with vectors
+    vectorList = []
+    for vector in loader:
+        vectorList.append(vector)
+    vectorArray = np.array(vectorList)
 
-        Returns
-        -------
-        vector: 2d array
+    # superpose
+    mask = np.zeros(shape)
+    for idx in range(len(coeffs)):
+        mask += vectorArray[idx] * coeffs[idx]
 
-        """
+    # convert to complex mask
+    mask = np.exp(1j * mask)
+    # calculate arg
+    # mask = _phase2SLM(mask)
 
-        return vector * self.calib_px / np.pi
-
-    
-    def _create_sorted_indices(self):
-        """ Create a a list of sorted 2d indices in order to generate
-            vectors with increased spatial frequency.
-
-        Returns
-        -------
-        a list of lists
-        """
-        indices = []
-        for n in range(self.N):
-            for m in range(self.N):
-                indices.append([n, m])
-        return sorted(indices, key=sum)
-
-    def _get_disk_mask(self):
-
-        res = (self.disk_diameter, self.disk_diameter)
-        mask_center = [res[0] // 2,res[1] // 2]
-        X, Y = np.meshgrid(np.arange(res[0]),np.arange(res[1]))
-
-        # We generate a mask representing the disk we want to intensity to be concentrated in
-        mask = (X - mask_center[0]) ** 2 + (Y - mask_center[1]) ** 2 < self.radius ** 2
-
-        return mask                                                 
-        
-    def _create_patterns(self):
-        """ Uses LightPipe library to create HG or LG patterns
-
-        Returns
-        -------
-            a list with all created patterns
-        """
-        disk = self._get_disk_mask()
-
-        patterns = []
-        
-        F = Begin(self.size, self.wavelength, self.M)
-        indices = self._create_sorted_indices()
-        for n, m in indices:
-                F = GaussBeam(F, self.w0, LG=self.LG, n=m, m=n)
-                amp = Intensity(0, F)
-                # phi = Phase(F)
-                patterns.append(amp)
-                
-        return patterns * disk
-    
+    return mask

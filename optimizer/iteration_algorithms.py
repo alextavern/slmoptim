@@ -6,7 +6,7 @@ from tqdm import trange
 from ..loader import patterns as pt
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from aotools.functions import phaseFromZernikes
+from aotools.functions import phaseFromZernikes, zernike_noll
 
 
 
@@ -341,30 +341,30 @@ class HadamardPartition(IterationAlgos):
 """ This class is implementing an idea found here https://www.wavefrontshaping.net/post/id/23
     that uses Zenike Polynomials to optimize optical aberrations on a focused laser bea,
 """
-class ZernikePolynomials():
+class CoefficientsOptimization():
     
     def __init__(self, 
                 slm, 
                 camera,
                 slm_resolution=(600, 800),
                 slm_calibration_pixel=112,
-                num_of_zernike_coeffs=4,
+                num_of_coeffs=4,
                 radius=300, 
-                center = [600 // 2, 800 // 2],
+                center=[600 // 2, 800 // 2],
                 remote=True,
-                save_path=None):
+                save_path=None): 
         
         self.slm = slm
         self.camera = camera
         
         # SLM
         resX, resY = slm_resolution
-        self.patternSLM = pt.Pattern(resX, resY)
+        self.patternSLM = pt.PatternsBacic(resX, resY)
         self.calib_px = slm_calibration_pixel
         self.shape = slm_resolution
         
         # Zernike
-        self.num_of_zernike_coeffs = num_of_zernike_coeffs
+        self.num_of_coeffs = num_of_coeffs
         self.radius = radius
         self.center = center
         
@@ -375,7 +375,7 @@ class ZernikePolynomials():
         # self.save_path = save_path
         # self.filepath = self._create_filepath()
     
-    def register_callback(self, callback):
+    def register_cost_callback(self, callback):
         """ This callback function is used to pass a custom cost function
             to the optimization object
 
@@ -384,7 +384,10 @@ class ZernikePolynomials():
         callback
             the cost function
         """
-        self.callback = callback
+        self.cost_callback = callback
+        
+    def register_pattern_callback(self, callback):
+        self.pattern_callback = callback
         
     def upload_pattern(self, pattern, slm_delay=0.1):
         """ Uploads a pattern to the SLM either in remote or local mode. Adds a user-defined
@@ -397,7 +400,7 @@ class ZernikePolynomials():
         time.sleep(slm_delay)
         
     
-    def get_frame(self):
+    def _get_frame(self):
         """ Get frame from zelux thorlabs camera
         """
         frame = self.camera.get_pending_frame_or_null()
@@ -421,7 +424,7 @@ class ZernikePolynomials():
         
         return mask.astype('bool')
         
-    def _complex_mask_from_zernike_coeff(self, vec):
+    def _complex_mask_from_coeff(self, vec):
         '''
         Taken from S. Popoff blog
         Generate a complex phase mask from a vector containting the coefficient of the first Zernike polynoms.
@@ -431,22 +434,22 @@ class ZernikePolynomials():
         :center: list of float, the coefficient of the first Zernike polynoms
         '''
         # Generate a complex phase mask from the coefficients
-        zern_mask = np.exp(1j * phaseFromZernikes(vec, 2 * self.radius))
-                
+        # zern_mask = np.exp(1j * phaseFromZernikes(vec, 2 * self.radius))
+        coeff_mask = self.pattern_callback(vec)
         # We want the amplitude to be 0 outside the disk, we fist generate a binary disk mask
         amp_mask = self._get_disk_mask()
         
         # put the Zernike mask at the right position and multiply by the disk mask
         mask = np.zeros(shape = self.shape, dtype='complex')
         mask[self.center[0] - self.radius:self.center[0] + self.radius,
-             self.center[1] - self.radius:self.center[1] + self.radius] = zern_mask * amp_mask
+             self.center[1] - self.radius:self.center[1] + self.radius] = coeff_mask * amp_mask
         
         return mask
     
     def _phase2SLM(self, mask):
         """ Converts a phase mask to the SLM readable  and phase-calibrated format
         """
-        arg = np.angle(mask, deg=False)
+        arg = np.angle(mask, deg=False) # gives angle betwwen -pi and pi
         # scale phase between 0 and 2pi
         # arg2pi = (arg + 2 * np.pi) % (2 * np.pi)
         arg2pi = arg + np.pi
@@ -464,24 +467,24 @@ class ZernikePolynomials():
         cost = []
         
         # initialize the coefficients to optimize
-        coeffs = np.zeros(self.num_of_zernike_coeffs)
+        coeffs = np.zeros(self.num_of_coeffs)
         # 
         coeff_idx = np.arange(coeff_range[0], coeff_range[1], coeff_range[2])
         
-        iterator = trange(self.num_of_zernike_coeffs)
+        iterator = trange(self.num_of_coeffs)
         for idx in iterator:
             cost_temp = []
             for coeff in coeff_idx:
                 coeffs[idx] = coeff
-                zmask = self._complex_mask_from_zernike_coeff(coeffs)
+                zmask = self._complex_mask_from_coeff(coeffs)
                 zmask = self._phase2SLM(zmask)
                 self.upload_pattern(zmask, 0.1)
                 
                 # get interferogram from camera
-                frame = self.get_frame()
+                frame = self._get_frame()
 
                 # calculate cost function and save it
-                cost_k = self.callback(frame)
+                cost_k = self.cost_callback(frame)
                 cost_temp.append(cost_k)
 
             # update pattern with max corr
@@ -491,10 +494,10 @@ class ZernikePolynomials():
             # just reload the optimal mask for this iteration and save 
             # the corresponding frame
             counter += 1 
-            zmask = self._complex_mask_from_zernike_coeff(coeffs)
+            zmask = self._complex_mask_from_coeff(coeffs)
             zmask = self._phase2SLM(zmask)
             self.upload_pattern(zmask, 0.1)
-            frame = self.get_frame()
+            frame = self._get_frame()
             frames[counter] = frame
             masks[counter] = zmask
             
