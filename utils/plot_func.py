@@ -4,7 +4,7 @@ from ..utils import camera_func as cam
 import matplotlib.pyplot as plt
 from ..loader import patterns as  pt
 import numpy as np
-import time
+import time, pickle, os
 
 def pattern_frame(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600), 
           remote=True, 
@@ -70,3 +70,39 @@ def two_frames(frame1, frame2, norm=True):
     fig.text(-0.01, 0.5, 'camera pixels y #', va='center', rotation='vertical')
     fig.tight_layout()
     return fig
+
+def create_filepath(self):
+    """ creates a filepath to save data
+    """
+
+    date_str = time.strftime("%Y%m%d")
+    date_time_str = time.strftime("%Y%m%d-%H:%M")
+    
+    new_path = os.path.join(self.save_path, date_str)
+    
+    # check if dir exists
+    isExist = os.path.exists(new_path)
+    # and create it
+    if not isExist:
+        os.makedirs(new_path)
+    
+    # filename = '{}_tm_raw_data_num_in{}_slm_macro{}'.format(date_time_str,  
+    #                                                         self.num_in, 
+    #                                                         self.slm_macropixel_size)
+    filename = '{}_'.format(date_time_str) + '{}_raw_data_num_in{}_slm_macro{}'.format(self.type, 
+                                                                                       self.num_in, 
+                                                                                       self.slm_macropixel_size)
+    
+    if self.save_path:
+        self.filepath = os.path.join(new_path, filename)
+    else:
+        self.filepath = filename
+        
+    return self.filepath
+        
+def save_raw(self):
+    """ saves raw data to a pickle format
+    """
+
+    with open(self.filepath + '.pkl', 'wb') as fp:
+        pickle.dump((self.frames), fp)

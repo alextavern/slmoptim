@@ -1,5 +1,8 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from ..loader import patterns as pt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 
 class Target:
     def __init__(self, shape) -> None:
@@ -125,3 +128,24 @@ class InverseLight:
         self.phase_mask_enlarged = pt.PatternsBacic._enlarge_pattern(phase_mask, self.phase_mask_mag)
         
         return self.phase_mask_enlarged
+    
+    def plot_save(self, savepath=None):
+    
+        fig, axs = plt.subplots(1, 2, figsize=(10,10))
+
+        tar = axs[0].imshow(abs(self.target))
+        divider = make_axes_locatable(axs[0])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(tar, cax=cax)   
+
+        inv_foc = axs[1].imshow(abs(self.inv_operator_focus))
+        divider = make_axes_locatable(axs[1])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(inv_foc, cax=cax)   
+
+        fig.tight_layout()
+        
+        if savepath:
+            plt.savefig(savepath + '_operator', dpi=200)
+        
+        return fig

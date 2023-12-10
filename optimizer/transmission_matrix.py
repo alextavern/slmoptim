@@ -62,6 +62,7 @@ class measTM:
         
         # save raw data path
         self.save_path = save_path
+        self.filepath = self._create_filepath()
         
     def get(self):
         """ Opens two parallel threads one to upload patterns to the SLM and one to download frames
@@ -154,14 +155,15 @@ class measTM:
         print("ΤΜ acquisition completed ! ")
             
         return self.frames
-        
-    def save(self):
-        """ creates a filename ans saves raw data
-            to a pickle format
+    
+    def _create_filepath(self):
+        """ creates a filepath to save data
         """
 
-        timestr = time.strftime("%Y%m%d")
-        new_path = os.path.join(self.save_path, timestr)
+        date_str = time.strftime("%Y%m%d")
+        date_time_str = time.strftime("%Y%m%d-%H:%M")
+        
+        new_path = os.path.join(self.save_path, date_str)
         
         # check if dir exists
         isExist = os.path.exists(new_path)
@@ -169,20 +171,24 @@ class measTM:
         if not isExist:
             os.makedirs(new_path)
         
-        filename = '{}_tm_raw_data_num_in{}_slm_macro{}.pkl'.format(timestr,  
-                                                                    self.num_in, 
-                                                                    self.slm_macropixel_size)
+        filename = '{}_tm_raw_data_num_in{}_slm_macro{}'.format(date_time_str,  
+                                                                self.num_in, 
+                                                                self.slm_macropixel_size)
         
         if self.save_path:
-            filepath = os.path.join(new_path, filename)
+            self.filepath = os.path.join(new_path, filename)
         else:
-            filepath = filename
+            self.filepath = filename
+            
+        return self.filepath
         
-        with open(filepath, 'wb') as fp:
+    def save(self):
+        """ saves raw data to a pickle format
+        """
+
+        with open(self.filepath + '.pkl', 'wb') as fp:
             pickle.dump((self.frames), fp)
         
-        
-
 class calcTM(measTM):
 
     def __init__(self, data, loader=None):
