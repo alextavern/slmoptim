@@ -4,6 +4,14 @@ from tqdm.auto import tqdm
 import numpy as np
 import time, cv2
 
+
+def set_mirror(slm, resolution=(800, 600)):
+    resX, resY = resolution
+    patSLM = pt.PatternsBacic(resX, resY)
+    mirror = patSLM.mirror()
+    slm.sendArray(mirror)
+    time.sleep(.2)
+    
 class SlmUploadPatternsThread(threading.Thread):
     
     def __init__(self, slm, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, num_in=16, slm_macropixel_size=5, path=None):

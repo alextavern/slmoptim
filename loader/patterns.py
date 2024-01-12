@@ -248,7 +248,7 @@ class PatternsBacic:
 
         return hadamard_vector, pattern.astype('uint8')
 
-    def pattern_to_SLM(self, vector, n=1, gray=0):
+    def pattern_to_SLM(self, vector, n=1, gray=0, off=(0, 0)):
         """
         puts an enlarged vector in the middle of the slm screen
         
@@ -269,16 +269,17 @@ class PatternsBacic:
         # make sure that the image is composed by 8bit integers between 0 and 255
         pattern = np.full(shape=(cols, rows), fill_value=gray).astype('uint8')
 
-          # enlarge vector by "macropixeling"
-        vector = self._enlarge_pattern(vector, n)
+        # enlarge vector by "macropixeling"
+        vector = self._enlarge_pattern2(vector, n)
         # replace values to grayscale-phase values
         # vector = self._hadamard_int2phase(vector)
 
         # put it in the middle of the slm screen
         # first calculate offsets from the image center
+        offx, offy = off
         subpattern_dim = vector.shape
-        offset_x = int(rows / 2 - subpattern_dim[0] / 2)
-        offset_y = int(cols / 2 - subpattern_dim[1] / 2)
+        offset_x = int(rows / 2 - subpattern_dim[0] / 2) + offx
+        offset_y = int(cols / 2 - subpattern_dim[1] / 2) + offy
         # and then add the vector in the center of the initialized pattern
         pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = vector
 
@@ -347,6 +348,26 @@ class PatternsBacic:
 
         return matrix
     
+    @staticmethod
+    def _enlarge_pattern2(matrix, n):
+        """
+        it takes as input a 2d matrix and augments its dimensions by 2^(n-1) by conserving the same pattern
+        Parameters
+        ----------
+        matrix: input 2d array
+        n: magnification factor
+
+        Returns
+        -------
+        matrix: enlarged 2d array
+        """
+
+        if n < 1:
+            raise Exception("sorry, magnification factor should not be zero")
+        matrix = np.repeat(np.repeat(matrix, n, axis=1), n, axis=0)
+        
+        return matrix
+
     # def pattern2SLM(self, pattern, n):
     #     temp = self._enlarge_pattern(pattern, n)
     #     temp = self.add_subpattern(temp)

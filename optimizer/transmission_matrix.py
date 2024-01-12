@@ -1,6 +1,8 @@
+from . import phase_conjugation
 from ..loader import patterns as pt
 from ..utils import upload as up
 from ..utils import download as down
+
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from slmPy import slmpy
 from scipy.linalg import hadamard
@@ -13,6 +15,8 @@ import time
 import os
 import warnings
 
+
+
 """
 """
 
@@ -24,6 +28,7 @@ class measTM:
                  pattern_loader, 
                  slm_macropixel_size,
                  slm_resolution=(800, 600),
+                 off=(0, 0),
                  calib_px=112,
                  remote=True, 
                  corr_path=None,
@@ -52,6 +57,7 @@ class measTM:
         self.slm_macropixel_size = slm_macropixel_size
         self.calib_px = calib_px
         self.resX, self.resY = slm_resolution
+        self.off = off
         self.remote = remote # is the slm connected to a raspberry Pi ?
         
         # load basis patterns
@@ -133,7 +139,7 @@ class measTM:
         for vector in tqdm(self.pattern_loader, desc="Uploading pattern vectors", leave=True):
             # and for each vector load the four reference phases
             for phase in four_phases:
-                pattern = slm_patterns.pattern_to_SLM(vector, self.slm_macropixel_size, phase)
+                pattern = slm_patterns.pattern_to_SLM(vector, self.slm_macropixel_size, phase, self.off)
                 if self.remote:
                     self.slm.sendArray(pattern)
                 else:
@@ -191,9 +197,11 @@ class measTM:
         
 class calcTM(measTM):
 
-    def __init__(self, data, loader=None):
+    def __init__(self, data, slm_macropixel=112, loader=None):
         self.data = data
         self.loader = loader
+        self.slm_macropixel = slm_macropixel
+
     
     @staticmethod
     def four_phases_method(intensities):
@@ -305,19 +313,24 @@ class calcTM(measTM):
         
         return tm_can
     
-    def calc(self):
+    def calc_tm(self):
+        self.tm_obs = self._calc_obs()
+        self.tm_fil = self._normalize()
+        # tm = self._had2canonical(tm_fil)
+        self.tm = self._change_to_canonical_basis(self.tm_fil, self.loader)
+        
+        return self.tm_obs, self.tm_fil, self.tm
+    
+    
+    def calc_plot_tm(self, figsize=(10, 5)):
     
         self.tm_obs = self._calc_obs()
         self.tm_fil = self._normalize()
         # tm = self._had2canonical(tm_fil)
         self.tm = self._change_to_canonical_basis(self.tm_fil, self.loader)
         
-        return self.tm_obs, self.tm_fil, self.tm   
-    
-    def plot(self, figsize=(10, 5)):
-        
         fig, axs = plt.subplots(nrows=1, ncols=3, sharex=True, sharey=True, figsize=figsize)
-            
+        
         obs = axs[0].imshow(abs(self.tm_obs), aspect='auto')
         divider = make_axes_locatable(axs[0])
         cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -329,7 +342,7 @@ class calcTM(measTM):
         cax = divider.append_axes("right", size="5%", pad=0.05)
         fig.colorbar(fil, cax=cax)
         
-        can = axs[2].imshow(abs(tm), aspect='auto')
+        can = axs[2].imshow(abs(self.tm), aspect='auto')
         divider = make_axes_locatable(axs[2])
         cax = divider.append_axes("right", size="5%", pad=0.05)
         fig.colorbar(can, cax=cax)
@@ -342,40 +355,91 @@ class calcTM(measTM):
         fig.text(-0.01, 0.5, 'camera pixels #', va='center', rotation='vertical')
         fig.tight_layout()
         
+        # if self.savepath:
+        #     figpath = self.filepath + 'tm'
+        #     plt.savefig(figpath, dpi=200, transparent=True)
+        
+        return self.tm_obs, self.tm_fil, self.tm  
+    
+    def fit(self, tgt_offset=(0, 0), tgt_size=(1, 1)): 
+        
+         # define target
+        target_shape = (int(self.tm.shape[0] ** 0.5), int(self.tm.shape[0] ** 0.5))
+
+        tgt = phase_conjugation.Target(target_shape)
+
+        x, y = tgt_offset
+
+        target_frame = tgt.square(tgt_size, offset_x=x, offset_y=y, intensity=1)
+        # target_frame = tgt.gauss(num=16, order=0, w0=1e-4, slm_calibration_px=112)
+
+        # phase conjugation - create mask
+        msk = phase_conjugation.InverseLight(target_frame, self.tm, slm_macropixel=self.slm_macropixel, calib_px=112)
+        phase_mask = msk.inverse_prop(conj=True)
+
+        # merge phase mask into an slm pattern
+        patternSLM = pt.PatternsBacic(self.resX, self.resY)
+        focusing_mask = patternSLM.pattern_to_SLM(phase_mask, gray = 10)
+
+        # apply mask
+        self.slm.sendArray(focusing_mask)
+        time.sleep(0.2)
+
+        # and plot/save
+        
+        # get frame
+        frame = self.camera.get_pending_frame_or_null()
+        frame_focus = np.copy(frame.image_buffer)
+        profile_line = len(frame_focus) // 2 
+
+        # set mirror to get speckle
+        patSLM = pt.PatternsBacic(self.resX, self.resY)
+        mirror = patSLM.mirror()
+        self.slm.sendArray(mirror)
+        time.sleep(.2)
+        frame = self.camera.get_pending_frame_or_null()
+        frame_speck = np.copy(frame.image_buffer)
+
+        # do the plotting
+        fig, axs = plt.subplots(2, 2, figsize=(10,10))
+
+        speck = axs[0, 0].imshow(frame_speck)
+        axs[0, 0].set_title("Diffusing pattern")
+        axs[0, 0].set_xlabel("Camera x px #")
+        axs[0, 0].set_ylabel("Camera y px #")
+        divider = make_axes_locatable(axs[0, 0])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(speck, cax=cax)   
+
+        mask = axs[1, 0].imshow(focusing_mask)
+        axs[1, 0].set_title("Focus mask")
+        axs[1, 0].set_xlabel("SLM x px #")
+        axs[1, 0].set_ylabel("SLM y px #")
+        divider = make_axes_locatable(axs[1, 0])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(mask, cax=cax)   
+
+        frame = axs[0, 1].imshow(frame_focus)
+        axs[0, 1].set_title("Focusing")
+        axs[0, 1].set_xlabel("Camera x px #")
+        axs[0, 1].set_ylabel("Camera y px #")
+        divider = make_axes_locatable(axs[0, 1])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(frame, cax=cax)   
+
+        axs[1, 1].plot(frame_focus[profile_line][:])
+        axs[1, 1].plot(frame_focus[:][profile_line])
+        axs[1, 1].set_box_aspect(1)
+        axs[1, 1].set_title("Focus profile")
+        axs[1, 1].set_xlabel("Camera x px #")
+        axs[1, 1].set_ylabel("Intensity (a.u.) #")
+
+        fig.tight_layout()
+
+        self.slm.sendArray(focusing_mask)
+        
+        if self.savepath:
+            figpath = self.savepath
+            plt.savefig(figpath, dpi=200, transparent=True)
+            
         return fig
-    
-    def calc_plot_tm(self, figsize=(10, 5)):
-    
-        tm_obs = self._calc_obs()
-        tm_fil = self._normalize()
-        # tm = self._had2canonical(tm_fil)
-        tm = self._change_to_canonical_basis(tm_fil, self.loader)
-        
-        fig, axs = plt.subplots(nrows=1, ncols=3, sharex=True, sharey=True, figsize=figsize)
-        
-        obs = axs[0].imshow(abs(tm_obs), aspect='auto')
-        divider = make_axes_locatable(axs[0])
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        fig.colorbar(obs, cax=cax)
-        
-        
-        fil = axs[1].imshow(abs(tm_fil), aspect='auto')
-        divider = make_axes_locatable(axs[1])
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        fig.colorbar(fil, cax=cax)
-        
-        can = axs[2].imshow(abs(tm), aspect='auto')
-        divider = make_axes_locatable(axs[2])
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        fig.colorbar(can, cax=cax)
-
-        axs[0].set_title("Hadamard TM")
-        axs[1].set_title("Filtered TM")
-        axs[2].set_title("Canonical TM")
-
-        fig.text(0.5, -0.01, 'slm pixels #', ha='center')
-        fig.text(-0.01, 0.5, 'camera pixels #', va='center', rotation='vertical')
-        fig.tight_layout()
-        
-        return tm_obs, tm_fil, tm   
-             

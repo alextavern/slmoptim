@@ -67,8 +67,9 @@ class InverseLight:
         return self.tm_T_star
     
     def _inverse(self):
-        self.tm_inv = np.linalg.inv(self.tm)
-        return self.tm_inv
+        # self.tm_inv = np.linalg.inv(self.tm)
+        self.tm_svd = np.linalg.svd(self.tm)
+        return self.tm_svd
 
         
     def calc_inv_operator(self):
@@ -125,7 +126,7 @@ class InverseLight:
             phase_mask[ij[0], ij[1]] = arg2SLM[idx]
             
         # enlarge pattern for the SLM macropixels
-        self.phase_mask_enlarged = pt.PatternsBacic._enlarge_pattern(phase_mask, self.phase_mask_mag)
+        self.phase_mask_enlarged = pt.PatternsBacic._enlarge_pattern2(phase_mask, self.phase_mask_mag)
         
         return self.phase_mask_enlarged
     

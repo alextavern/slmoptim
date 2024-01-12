@@ -4,7 +4,7 @@ import pickle
 from tqdm.auto import tqdm
 from tqdm import trange
 from ..loader import patterns as pt
-from ..utils.plot_func import create_filepath, save 
+from ..utils.plot_func import create_filepath
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from aotools.functions import phaseFromZernikes, zernike_noll
@@ -47,7 +47,7 @@ class IterationAlgos():
         
         # SLM
         resX, resY = slm_resolution
-        self.patternSLM = pt.Pattern(resX, resY)
+        self.patternSLM = pt.PatternsBacic(resX, resY)
         
         # is the slm remotely connected to a rasp pi ?
         self.remote = remote
@@ -93,8 +93,9 @@ class IterationAlgos():
         phi = self.phi_k(k)
         pattern[mask] = phi
         # temp = self.patternSLM.pattern2SLM(pattern, self.slm_macropixel)
-        temp = self.patternSLM._enlarge_pattern(pattern, self.slm_macropixel)
-        temp = self.patternSLM.add_subpattern(temp)
+        # temp = self.patternSLM._enlarge_pattern(pattern, self.slm_macropixel)
+        # temp = self.patternSLM.add_subpattern(temp)
+        temp = self.patternSLM.pattern_to_SLM(pattern, self.slm_macropixel)
         return temp
 
     def upload_pattern(self, pattern, slm_delay=0.1):
@@ -204,7 +205,7 @@ class ContinuousSequential(IterationAlgos):
              
             # sweep each slm pixel
             with tqdm(self.pattern_loader) as pat_epoch:
-                for _, mask, _ in pat_epoch:
+                for mask in pat_epoch:
                     temp_pattern = self.final_pattern.copy()
                     corr = []
                     # sweep phase at each pixel
@@ -345,8 +346,22 @@ class HadamardPartition(IterationAlgos):
 """ This class is implementing an idea found here https://www.wavefrontshaping.net/post/id/23
     that uses Zenike Polynomials to optimize optical aberrations on a focused laser bea,
 """
-class CoefficientsOptimization():
-    
+class CoefficientsOptimization(IterationAlgos):
+   
+    #    def __init__(self, 
+    #              slm, 
+    #              camera,
+    #              pattern_loader,
+    #              total_iterations=1,
+    #              slm_resolution=(800, 600),
+    #              slm_segments=256,
+    #              slm_macropixel=5, 
+    #              slm_calibration_pixel=112,
+    #              phase_steps=8,
+    #              type="cont",
+    #              remote=True,
+    #              save_path=None):
+            
     def __init__(self, 
                 slm, 
                 camera,
@@ -467,6 +482,7 @@ class CoefficientsOptimization():
     def run(self, coeff_range=(-2, 2, 0.5)):
         
         counter = 0
+        self.data_out = {}
         frames = {}
         masks = {}
         cost = []
@@ -511,5 +527,12 @@ class CoefficientsOptimization():
             iterator.set_description(' | '.join(descr))
             iterator.set_postfix(Cost=cost[idx])
             iterator.refresh()
+            
+            # save all into a big dict
 
-        return zmask, coeffs, cost, (masks, frames)
+            self.data_out["coeffs"] = coeffs
+            self.data_out["cost"] = cost
+            self.data_out["frames"] = frames
+            self.data_out["masks"] = masks
+
+        return self.data_out

@@ -25,9 +25,9 @@ class IterationAlgos():
                  calib_px=112, 
                  total_iterations=1,
                  phase_steps=8, 
-                 remote=True, 
-                 save_path=None, 
-                 type=None):
+                 remote=True,
+                 type=None, 
+                 save_path=None):
         
         # slm settings
         # self.N = int(slm_segments ** 0.5)
@@ -52,13 +52,8 @@ class IterationAlgos():
         
         # save raw data path
         self.save_path = save_path
-        
-        # define a filename
-        self.type = type
-        if save_path:
-            self.filepath = types.MethodType(create_filepath, self)
-            self.save_raw = types.MethodType(save_raw, self)
-     
+
+
     def register_callback(self, callback):
         """ This callback function is used to pass a custom cost function
             to the optimization object
@@ -69,6 +64,9 @@ class IterationAlgos():
             the cost function
         """
         self.callback = callback
+        
+    # def create_filepath(self, **kwargs): staticmethod(create_filepath(self, **kwargs))
+        
     
     def _phi_k(self, k):
         """ Returns the slm-calibrated phase sweep values, the discretization of which is defined by the
@@ -124,38 +122,39 @@ class IterationAlgos():
         
         return arg2SLM.astype('uint8')
     
-    
-    # def _create_filepath(self):
-    #     """ Creates a directory and a filename to save raw data
-    #         and figures
-    #     """
+    def _create_filepath(self, **kwargs):
+        """ creates a filepath to save data
+        """
 
-    #     timestr = time.strftime("%Y%m%d")
-    #     new_path = os.path.join(self.save_path, timestr)
+        date_str = time.strftime("%Y%m%d")
+        date_time_str = time.strftime("%Y%m%d-%H:%M")
         
-    #     # check if dir exists
-    #     isExist = os.path.exists(new_path)
-    #     # and create it
-    #     if not isExist:
-    #         os.makedirs(new_path)
+        new_path = os.path.join(self.save_path, date_str)
         
-    #     # define a filename
-    #     filename = '{}_optim_raw_data_{}_slm_segs{}_slm_macro{}.'.format(timestr,
-    #                                                                         self.type,
-    #                                                                         self.N ** 2, 
-    #                                                                         self.slm_macropixel)
-    #     if self.save_path:
-    #         self.filepath = os.path.join(new_path, filename)
-    #     else:
-    #         self.filepath = self.filename
+        # check if dir exists
+        isExist = os.path.exists(new_path)
+        # and create it
+        if not isExist:
+            os.makedirs(new_path)
+        
+        # create the filename based on kwargs    
+        date_time_str = time.strftime("%Y%m%d-%H:%M")
+        filename = str(date_time_str)
+        for key, value in kwargs.items():
+            filename += '_'
+            filename += str(key) +  str(value)
+        
+        if self.save_path:
+            self.filepath = os.path.join(new_path, filename)
+        else:
+            self.filepath = filename
             
-    #     return self.filepath
+        return self.filepath
     
-    
-    # def save_raw(self):      
+    def save_raw(self):      
 
-    #     with open(self.filepath + 'pkl', 'wb') as fp:
-    #         pickle.dump((self.frames, self.cost, self.final_pattern), fp)
+        with open(self.filepath + '.pkl', 'wb') as fp:
+            pickle.dump((self.data_out), fp)
             
     def plot(self, frame, idx):
         
@@ -192,7 +191,7 @@ class IterationAlgos():
 
         fig.tight_layout()
         
-        plt.savefig(self.filepath + "png", dpi=400, transparent=True)
+        plt.savefig(self.filepath, dpi=400, transparent=True)
         
         
         
@@ -401,6 +400,8 @@ class CoefficientsOptimization(IterationAlgos):
         # self.type
         # self.save_path = save_path
         # self.filepath = self._create_filepath()
+        self.filepath = self._create_filepath(type='CoeffsOptim', coeffs_num=str(num_of_coeffs))
+
     
     def register_cost_callback(self, callback):
         """ This callback function is used to pass a custom cost function
@@ -458,6 +459,7 @@ class CoefficientsOptimization(IterationAlgos):
     def run(self, coeff_range=(-2, 2, 0.5)):
         
         counter = 0
+        self.data_out = {}
         frames = {}
         masks = {}
         cost = []
@@ -503,4 +505,11 @@ class CoefficientsOptimization(IterationAlgos):
             iterator.set_postfix(Cost=cost[idx])
             iterator.refresh()
 
-        return zmask, coeffs, cost, (masks, frames)
+            # save all into a big dict
+
+            self.data_out["coeffs"] = coeffs
+            self.data_out["cost"] = cost
+            self.data_out["frames"] = frames
+            self.data_out["masks"] = masks
+
+        return self.data_out
