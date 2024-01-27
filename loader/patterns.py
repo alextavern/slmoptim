@@ -10,11 +10,16 @@ import random
 
 """
 A class that creates various patterns to be uploaded to an SLM:
-1/ a simple mirror 
+1/ a simple mirror (for slm "deactivation")
 2/ a bi-mirror (for popoff calibration)
 3/ a diffraction grating (for a simple calibration)
 4/ a mirror + diffraction grating (for the thorlabs calibration)
-5/ a series of methods that create a hadamard vector pattern
+5/ a series of methods that create a hadamard vector pattern - this one has become useless because of the HadamardPatternLoader class
+   (to be removed)
+
+Some additional methods are also include to adjust a given pattern to the SLM screen:
+a/ enlarge_pattern, it only magnifies the pattern
+b/ pattern_to_SLM, adds in a center of the SLM screen
 """
 
 class PatternsBacic:
@@ -22,7 +27,9 @@ class PatternsBacic:
     def __init__(self, res_x, res_y, grayphase=112):
         """
         constructs the pattern class which permits to generate a bunch of patterns ready to upload to
-        a SLM. It needs the resolution of the SLM screen and its calibration grayscale value. 
+        a SLM. Here, each method generates one pattern mask to be directly used with the SLM.
+        It needs the resolution of the SLM screen and its calibration grayscale value. 
+
         Parameters
         ----------
         res_x
@@ -88,7 +95,8 @@ class PatternsBacic:
     
     def grad_mirror(self, axis=0):
         """
-        creates a gradient mirror
+        creates a gradient mirror. This can be useful in order to filter out
+        diffraction spots from the slm pixels. Another popoff suggestion. To implement experimentaly.
 
         Parameters
         ----------
@@ -286,14 +294,7 @@ class PatternsBacic:
         return pattern.astype('uint8')
     
     def random(self, dim):
-        """_summary_
 
-        Args:
-            dim (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
         phase_list = np.arange(0, 2 * self.grayphase + 1, self.grayphase / 4)
         pattern = np.array([[random.choice(phase_list) for i in range(dim)] for j in range(dim)])
         return pattern.astype('uint8')
@@ -328,7 +329,8 @@ class PatternsBacic:
     @staticmethod
     def _enlarge_pattern(matrix, n):
         """
-        it takes as input a 2d matrix and augments its dimensions by 2^(n-1) by conserving the same pattern
+        It takes as input a 2d matrix and augments its dimensions by 2^(n-1) by conserving the same pattern
+        To be removed. The 2^(n-1) factor is not well adapted as it leaed to underfilling the useful slm screen.
         Parameters
         ----------
         matrix: input 2d array
@@ -351,8 +353,7 @@ class PatternsBacic:
     @staticmethod
     def _enlarge_pattern2(matrix, n):
         """
-        it takes as input a 2d matrix and augments its dimensions by 2^(n-1) by conserving the same pattern
-        Parameters
+        a better and simpler version of enlarge_pattern where any magnification can be done
         ----------
         matrix: input 2d array
         n: magnification factor
@@ -368,13 +369,21 @@ class PatternsBacic:
         
         return matrix
 
-    # def pattern2SLM(self, pattern, n):
-    #     temp = self._enlarge_pattern(pattern, n)
-    #     temp = self.add_subpattern(temp)
-    #     return temp
-    
     def correct_aberrations(self, correction, pattern, alpha=0.5):
+        """ A method to superpose a correction pattern to any mask to be uploaded on the SLM
+        Parameters
+        ----------
+        correction : 2-d array, 
+            the correction pattern
+        pattern : 2-d array
+        alpha : float,
+            the transparency-mixing parameter, by default 0.5
 
+        Returns
+        -------
+        2-d array
+            the final "corrected" pattern
+        """
         
         # blend images
         beta = (1.0 - alpha)
@@ -382,11 +391,25 @@ class PatternsBacic:
         # pattern = pattern + corr_patt2
         
         return pattern.astype('uint8')
-    
+ 
+
+""" A series of "pattern-loader" classes
+
+    BasePatternGenerator: the basis class that provides methods to be inherited
+
+    a/ OnePixelPatternGenerator
+    b/ RandomPatternGenerator
+    c/ HadamardPatternGenerator
+    d/ GaussPatternGenerator
+    e/ LaguerrePatternGenerator
+    f/ ZernikePatternGenerator
+    g/ PlaneWavePatternGenerator
+    e/ ... 
+"""
 
 class BasePatternGenerator:
     def __init__(self, num_of_segments, num_of_patterns):
-        
+
         self.N = num_of_patterns
         self.M = num_of_segments
         self.disk_diameter = int(num_of_segments ** 0.5)
@@ -646,7 +669,7 @@ class LaguerrePatternGenerator(BasePatternGenerator):
                 num_of_patterns=16,
                 waist=100,
                 phase=True,
-                slm_calibration_px=112):
+                slm_calibration_px=112):    
                 
         super().__init__(num_of_segments, 
                         num_of_patterns)
@@ -656,6 +679,7 @@ class LaguerrePatternGenerator(BasePatternGenerator):
         self.patterns = self._create_patterns()
 
     def _create_patterns(self):
+        """ Uses diffractio package """
         
         patterns = []
         
@@ -694,7 +718,10 @@ class ZernikePatternGenerator(BasePatternGenerator):
         self.patterns = self._create_patterns()
 
     def _create_patterns(self):
-        disk = self._get_disk_mask()
+        """ Uses AOtools
+        """
+
+        # disk = self._get_disk_mask()
         patterns = []
 
         for idx in range(1, self.N + 2):
@@ -768,6 +795,7 @@ class PlaneWaveGenerator(BasePatternGenerator):
     
 def superpose(loader, coeffs):
     """ A simple function that creates a linear combination of given vectors
+        It is used with coefficient optimizer.
 
     Args:
         loader: pattern loader object

@@ -1,8 +1,14 @@
 from slmPy import slmpy
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
-class InitExperiment():
+""" This class is used to initialize the hardware parts ot the experiment.
+    Here, the SLM - using slmpy - and the Zelux Thorcam - using the thorlabs SDK.
+    It is called at the beginning and the end of every experiment to 
+    create and destroy the hardware objects.
+"""
 
+class InitExperiment():
+    
     def __init__(self, 
                  roi_size=100, 
                  roi_off=(0, 0), 
@@ -28,6 +34,8 @@ class InitExperiment():
         self.monitor = monitor
         
     def init_slm(self):
+        """ initializes slmpy SLM
+        """
         if self.remote:
             self.slm = slmpy.Client()
             self.slm.start(self.SERVER)
@@ -64,12 +72,7 @@ class InitExperiment():
         return roi
         
     def init_cam(self):
-        """_summary_
-
-        Returns
-        -------
-        _type_
-            _description_
+        """ Initializes and sets camera parameters
         """
         # camera instance
         self.sdk = TLCameraSDK()
