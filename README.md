@@ -1,4 +1,4 @@
-# slmOptim
+# slmoptim
 #### Spatial Light Modulator Optimizer
 This is python package that contains a collection of modules that serve to solve an optiization problem in experimental optics. 
 
