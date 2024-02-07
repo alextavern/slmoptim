@@ -42,7 +42,7 @@ The experimental flowchart should follow this protocol:
 Some jupyter notebooks and scripts are included showcasing how this code can be used. 
 
 
-[^1] https://github.com/wavefrontshaping/slmPy
-[^2] https://www.thorlabs.com/software_pages/ViewSoftwarePage.cfm?Code=ThorCam
-[^3] https://journals.aps.org/prl/pdf/10.1103/PhysRevLett.104.100601
-[^4] https://opg.optica.org/oe/fulltext.cfm?uri=oe-23-9-12189&id=315860
+[^1]: https://github.com/wavefrontshaping/slmPy
+[^2]: https://www.thorlabs.com/software_pages/ViewSoftwarePage.cfm?Code=ThorCam
+[^3]: https://journals.aps.org/prl/pdf/10.1103/PhysRevLett.104.100601
+[^4]: https://opg.optica.org/oe/fulltext.cfm?uri=oe-23-9-12189&id=315860
