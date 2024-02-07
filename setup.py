@@ -1,13 +1,13 @@
 from setuptools import setup
 
-setup(name='slmOptim',
+setup(name='slmoptim',
       version='0.1',
       description='A collection of packages for an optimization problem using a Spatial Light Modulator',
       author='Alexandros Tavernarakis',
       author_email='alexandre.tavernarakis@universite-paris-saclay.fr',
-      packages=['optimization', 'patternSLM', 'zeluxPy'],
+      packages=['initializer', 'loader', 'optimizer', 'utils'],
       py_modules=['.slmpy'],
       install_requires=['numpy', 'pandas', 'scipy'],
-      scripts=["speckle_analysis.py", "transmission_matrix.py", "optimizataion.py"]
+      scripts=["scripts/speckle_analysis.py", "scripts/transmission_matrix.py"]
       )
 
