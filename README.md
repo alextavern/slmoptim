@@ -12,7 +12,7 @@ The goal is to shape the wavefront of a coherent light source that is subsequent
 This package implements two basic wavefront optimization methods: the transmission matrix method and the iterative optimization method.
 
 #### Transmission matrix
-Inspired by the work of S. Popoff that first proposed the direct measurement of an optical system's transmission matrix, this package implements a similar method that, first, acquire the transmission matrix and, second, optimizes the wavefront by means of phase conjugation. 
+Inspired by the work of S. Popoff that first proposed the direct measurement of an optical system's transmission matrix, this package implements a similar method that first acquires the transmission matrix and, second, optimizes the wavefront by means of phase conjugation. 
 
 #### Iterative optimization method
 The seminal work of Mosk et al. proposed to use iterative optimization algorithms that maximize (or minimize) a well defined cost function. Here, we implement similar algorithms that can work with any kind of input signal (time series, camera frames)
