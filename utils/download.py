@@ -3,9 +3,106 @@ from typing import Any
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 import threading
 import numpy as np
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 
+class RedPi:
+    
+    def __init__(self, rp_server, num_of_samples=16384, clock=125e6, prescaler=2**11, num_of_avg=10, offset=5):
+            
+        self.rp = rp_server 
+        self.num_of_samples = num_of_samples
+        self.clock = clock
         
+        self.prescaler = prescaler
+        
+        self.rp.tx_txt('ACQ:DEC ' + str(self.prescaler))
+        
+        # make sure the prescaler was set
+        self.rp.tx_txt('ACQ:DEC?')
+        display('Prescaler set to: ' + str(self.rp.rx_txt()))
+        
+        # prepare buffer dataframes
+        self.buff_ffts = pd.DataFrame()
+        self.buffs = pd.DataFrame()
+        
+        self.num_of_avg = num_of_avg
+        self.offset = offset # the offset takes a certain number of spectra in the beginning. 
+                             # Sometimes the Red Pitaya produces trash in the first spectra
+
+    def acquire(self):
+        # do the acquisitions and save it in the computers memory (not on the Red Pitaya).
+        for i in range(1, self.num_of_avg + self.offset):
+            if i % 50 == 0:
+                display(i)
+            self.rp.tx_txt('ACQ:START')
+            self.rp.tx_txt('ACQ:TRIG NOW')
+            self.rp.tx_txt('ACQ:SOUR1:DATA?')
+
+            buff_string = ''
+            buff_string = self.rp.rx_txt()
+            buff_string = buff_string.strip('{}\n\r').replace("  ", "").split(',')
+            #display(buff_string)
+            self.buffs[i] = list(map(float, buff_string))
+            self.buff_ffts[i] = (np.fft.fft(self.buffs[i]) / self.num_of_samples)**2
+            
+        return self.buffs, self.buff_ffts
+        
+    def plot_timetrace(self, idx=1):
+        
+        x = np.arange(0, self.prescaler / self.clock * self.num_of_samples, self.prescaler / self.clock)
+
+        fig, ax = plt.subplots(figsize=(4, 3))
+        ax.plot(x * 1000, self.buffs[idx] * 1000, label='', lw=1)
+        ax.set_title('raw time trace');
+        ax.set_xlabel('Time (ms)')
+        ax.set_ylabel('Voltage (mV)')
+
+        return fig
+            
+    def _calc_fftfreq(self):
+        # determine the timestep to calculate the frequency axis
+        timestep = self.prescaler / self.clock
+        
+        # get the frequencies
+        self.freq = pd.Series(np.fft.fftfreq(self.num_of_samples, d=timestep))
+        self.freq2plot = self.freq[0:int(self.freq.size / 2)]
+        
+        return self.freq, self.freq2plot
+        
+            
+    def calc_fft(self, freq_range=(100, 1500), log=True):
+        
+        freq_min, freq_max = freq_range
+        self.freq, self.freq2plot = self._calc_fftfreq()
+        
+        # get the first usable spectrum into the result variable
+        fft_avgd = 2 * np.abs(self.buff_ffts[1 + self.offset][0:int(self.freq.size / 2)]) / self.num_of_avg
+        for i in range(2 + self.offset, self.num_of_avg + self.offset):
+            fft_avgd = fft_avgd + 2 * np.abs(self.buff_ffts[i][0:int(self.freq.size / 2)]) / self.num_of_avg
+        
+
+        # put it into a dataframe in order to easier select the frequency range
+        fft_df = pd.DataFrame({'Freq': self.freq2plot, 'FFT': np.sqrt(fft_avgd)})
+        # select frequency range
+        fft_df = fft_df[(fft_df['Freq'] >= freq_min) & (fft_df['Freq'] <= freq_max)]
+
+        # plot
+        fig, ax = plt.subplots(figsize=(4, 2))
+        fft_df.plot(x='Freq', y='FFT', ax=ax)
+        # ax.plot(self.freq2plot, np.sqrt(fft_avgd), label='Current Circuit')
+
+        ax.set_title('Noise Amplitude Spectrum (' + str(self.num_of_avg) + ' average)');
+        ax.set_xlabel('Freqency (Hz)')
+        ax.set_ylabel('Noise amplitude. (V/$\sqrt{Hz}$)')
+        ax.set_yscale('log')
+        if log: ax.set_xscale('log')
+        ax.legend(loc='upper right', bbox_to_anchor=(1, 1), prop={'size': 8})
+
+        return fft_df, fig
+    
         
 class FrameAcquisitionThread(threading.Thread):
     
