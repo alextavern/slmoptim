@@ -12,6 +12,36 @@ def set_mirror(slm, resolution=(800, 600)):
     slm.sendArray(mirror)
     time.sleep(.2)
     
+    
+         
+class SpatialLightModulator():
+    
+    def __init__(self,
+                 remote=True,
+                 SERVER = '10.42.0.234', 
+                 monitor=1):
+        
+        # slm settings
+        self.remote = remote
+        self.SERVER = SERVER
+        self.monitor = monitor
+        
+    def init_slm(self):
+        """ initializes slmpy SLM
+        """
+        if self.remote:
+            self.slm = slmpy.Client()
+            self.slm.start(self.SERVER)
+        else:    
+            self.slm = slmpy.SLMdisplay(self.monitor)
+        return self.slm
+    
+    def close_slm(self):
+        self.slm.close()
+
+   
+    
+    
 class SlmUploadPatternsThread(threading.Thread):
     
     def __init__(self, slm, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, num_in=16, slm_macropixel_size=5, path=None):

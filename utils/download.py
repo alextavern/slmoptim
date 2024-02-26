@@ -6,23 +6,77 @@ import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import redpitaya_scpi as scpi
 
 
-class RedPi:
+class ZeluxCamera():
     
-    def __init__(self, rp_server, num_of_samples=16384, clock=125e6, prescaler=2**11, num_of_avg=10, offset=5):
+    def __init__(self, **kwargs):
+
+        # camera settings
+        self.roi_size = kwargs.get('roi_size', 100)
+        self.roi_off = kwargs.get('roi_off', (0, 0))
+        self.bins = kwargs.get('bins', 1)
+        self.exposure_time = kwargs.get('exposure_time', 100)
+        self.gain = kwargs.get('gain', 1)
+        self.timeout = kwargs.get('timeout', 100)
+    
+    def init_cam(self):
+        """ Initializes and sets camera parameters
+        """
+        # camera instance
+        self.sdk = TLCameraSDK()
+        available_cameras = self.sdk.discover_available_cameras()
+        self.camera = self.sdk.open_camera(available_cameras[0])
+
+        # configure
+        self.camera.exposure_time_us = self.exposure_time  # set exposure to 11 ms
+        self.camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode
+        self.camera.image_poll_timeout_ms = self.timeout  # 1 second polling timeout
+        self.camera.roi = self.set_roi()
+
+        # set binning for camera macropixels
+        (self.camera.binx, self.camera.biny) = (self.bins, self.bins)
+
+        if self.camera.gain_range.max > self.gain:
+            db_gain = self.gain
+            gain_index = self.camera.convert_decibels_to_gain(db_gain)
+            self.camera.gain = gain_index
+
+        # arm - trigger
+        self.camera.arm(2)
+        self.camera.issue_software_trigger()
+        
+        return self.camera
+    
+    def close_cam(self):
+        self.camera.disarm()
+        self.camera.dispose()
+        self.sdk.dispose()  
+        
+class RedPitayaSCPI:
+
+    def launch(IP_address):
+        server = scpi.scpi(IP_address)
+        return server
+
+class RedPitaya:
+    
+    def __init__(self, rp_server, num_of_samples=16384, clock=125e6, decimation=8192, num_of_avg=10, offset=5):
             
         self.rp = rp_server 
         self.num_of_samples = num_of_samples
         self.clock = clock
         
-        self.prescaler = prescaler
+        # decimation factors of 1, 8, 64, 1024, 8192, 65536 are accepter with
+        # original redpitaya software
+        self.decimation = decimation
         
-        self.rp.tx_txt('ACQ:DEC ' + str(self.prescaler))
+        self.rp.tx_txt('ACQ:DEC ' + str(self.decimation))
         
-        # make sure the prescaler was set
+        # make sure the decimation was set
         self.rp.tx_txt('ACQ:DEC?')
-        display('Prescaler set to: ' + str(self.rp.rx_txt()))
+        display('Decimation set to: ' + str(self.rp.rx_txt()))
         
         # prepare buffer dataframes
         self.buff_ffts = pd.DataFrame()
@@ -52,7 +106,7 @@ class RedPi:
         
     def plot_timetrace(self, idx=1):
         
-        x = np.arange(0, self.prescaler / self.clock * self.num_of_samples, self.prescaler / self.clock)
+        x = np.arange(0, self.decimation / self.clock * self.num_of_samples, self.decimation / self.clock)
 
         fig, ax = plt.subplots(figsize=(4, 3))
         ax.plot(x * 1000, self.buffs[idx] * 1000, label='', lw=1)
@@ -64,7 +118,7 @@ class RedPi:
             
     def _calc_fftfreq(self):
         # determine the timestep to calculate the frequency axis
-        timestep = self.prescaler / self.clock
+        timestep = self.decimation / self.clock
         
         # get the frequencies
         self.freq = pd.Series(np.fft.fftfreq(self.num_of_samples, d=timestep))
