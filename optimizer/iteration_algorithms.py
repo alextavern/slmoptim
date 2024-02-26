@@ -9,6 +9,12 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from aotools.functions import phaseFromZernikes, zernike_noll
 
+from metavision_core.event_io.raw_reader import initiate_device
+from metavision_core.event_io import EventsIterator
+from metavision_sdk_core import OnDemandFrameGenerationAlgorithm
+from metavision_sdk_ui import EventLoop
+from metavision_hal import I_ROI
+import time
 
 
 class IterationAlgos():
@@ -108,6 +114,48 @@ class IterationAlgos():
             self.slm.updateArray(pattern)
         time.sleep(slm_delay)
         
+    def get_frame_prophesee(self):
+        """ Get a frame fromthe Prophesee camera 
+        """
+        self.delta_t = 10000 # integration time in mus
+
+        # Creation of the device and settings
+
+        device = initiate_device("")
+        self.height = device.get_i_geometry().get_height()
+        self.width = device.get_i_geometry().get_width()
+        device.get_i_roi().set_window(roi=I_ROI.Window(0, 0, 100, 100))
+        device.get_i_roi().enable(False)
+
+        # Creation of the iterator to iterate through the events 
+
+        mv_iterator = EventsIterator.from_device(device=device, delta_t=self.delta_t)
+        on_demand_gen = OnDemandFrameGenerationAlgorithm(self.width, self.height, self.delta_t)
+        frame = np.zeros((self.height, self.width, 3), np.uint8)
+        
+        # Events processing 
+
+        size = 0
+        numberLoop = 0
+        for evs in mv_iterator:
+            numberLoop+=1
+            on_demand_gen.process_events(evs)
+            if evs.size != 0:
+                ts = evs["t"][-1] # Last event time stamp
+                on_demand_gen.generate(ts, frame)
+            size += evs.size     
+            print("Duration of the buffer: ", evs['t'][-1]-evs['t'][0], "Absolute timestamp end:", evs['t'][-1])
+            if numberLoop == 1:
+                break
+            
+        #print("Total number of events:", size, numberLoop)
+        #img = np.mean(frame, axis=2)
+        #plt.imshow(img)
+        #plt.show()
+            
+        # We need to supress the device after usage
+            
+        del device
     
     def get_frame(self):
         """ Get frame from zelux thorlabs camera
