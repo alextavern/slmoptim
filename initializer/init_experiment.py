@@ -43,7 +43,7 @@ class InitExperiment:
 
 
 
-class InitExperiment():
+class InitExperiment2():
     
     def __init__(self, 
                  roi_size=100, 

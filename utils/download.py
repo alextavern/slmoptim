@@ -54,6 +54,14 @@ class ZeluxCamera():
         self.camera.dispose()
         self.sdk.dispose()  
         
+    def get(self):
+        """ Get frame from zelux thorlabs camera
+        """
+        frame = self.camera.get_pending_frame_or_null()
+        image_buffer = np.copy(frame.image_buffer)
+        
+        return image_buffer
+        
 class RedPitayaSCPI:
 
     def launch(IP_address):

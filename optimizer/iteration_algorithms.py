@@ -19,7 +19,7 @@ class IterationAlgos():
     
     def __init__(self, 
                  slm, 
-                 camera,
+                 input_hardware,
                  pattern_loader,
                  total_iterations=1,
                  slm_resolution=(800, 600),
@@ -32,7 +32,7 @@ class IterationAlgos():
                  save_path=None):
         
         self.slm = slm
-        self.camera = camera
+        self.camera = input_hardware
         
         self.total_iterations = total_iterations
 
@@ -109,12 +109,12 @@ class IterationAlgos():
         time.sleep(slm_delay)
         
     
-    def get_frame(self):
-        """ Get frame from zelux thorlabs camera
-        """
-        frame = self.camera.get_pending_frame_or_null()
-        image_buffer = np.copy(frame.image_buffer)
-        return image_buffer
+    # def get_frame(self):
+    #     """ Get frame from zelux thorlabs camera
+    #     """
+    #     frame = self.camera.get_pending_frame_or_null()
+    #     image_buffer = np.copy(frame.image_buffer)
+    #     return image_buffer
     
     def _create_filepath(self):
         """ Creates a directory and a filename to save raw data
@@ -217,7 +217,8 @@ class ContinuousSequential(IterationAlgos):
                         self.upload_pattern(temp)
 
                         # get interferogram from camera
-                        frame = self.get_frame()
+                        # frame = self.get_frame()
+                        frame = self.camera.get()
 
                         # calculate correlation here
                         corr_k = self.callback(frame)
@@ -408,6 +409,9 @@ class CoefficientsOptimization(IterationAlgos):
         
     def register_pattern_callback(self, callback):
         self.pattern_callback = callback
+        
+    def register_download_callback(self, callback):
+        self.download_callback = callback
         
     def upload_pattern(self, pattern, slm_delay=0.1):
         """ Uploads a pattern to the SLM either in remote or local mode. Adds a user-defined
