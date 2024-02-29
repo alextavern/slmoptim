@@ -6,8 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import redpitaya_scpi as scpi
-
+from .redpitaya_scpi import scpi
 
 class ZeluxCamera():
     
@@ -20,6 +19,31 @@ class ZeluxCamera():
         self.exposure_time = kwargs.get('exposure_time', 100)
         self.gain = kwargs.get('gain', 1)
         self.timeout = kwargs.get('timeout', 100)
+    
+    def set_roi(self):
+        """ Calculates the Region of interest. The user gives a window size and x, y offsets from
+            the sensor center
+
+        Returns
+        -------
+        roi (tuple or int)
+        """
+        if type(self.roi_size) is tuple:
+            width, height = self.roi_size
+        else:
+            width = self.roi_size
+            height = width
+            
+        offset_x, offset_y = self.roi_off
+        middle_x = int(1440 / 2) + offset_x
+        middle_y = int(1080 / 2) - offset_y
+
+        roi = (middle_x - int(width/ 2), 
+            middle_y - int(height / 2), 
+            middle_x + int(width / 2), 
+            middle_y + int(height / 2))
+        
+        return roi
     
     def init_cam(self):
         """ Initializes and sets camera parameters
@@ -62,22 +86,26 @@ class ZeluxCamera():
         
         return image_buffer
         
-class RedPitayaSCPI:
+# class RedPitayaSCPI:
 
-    def launch(IP_address):
-        server = scpi.scpi(IP_address)
-        return server
+#     def launch(IP_address):
+#         server = scpi.scpi(IP_address)
+#         return server
 
 class RedPitaya:
     
-    def __init__(self, rp_server, num_of_samples=16384, clock=125e6, decimation=8192, num_of_avg=10, offset=5):
-            
-        self.rp = rp_server 
+    def __init__(self, IP_address='172.24.40.69', num_of_samples=16384, clock=125e6, decimation=8192, num_of_avg=10, offset=5):
+        
+        # pass arguments
+        self.IP = IP_address 
         self.num_of_samples = num_of_samples
         self.clock = clock
         
+        # launch scpi server - make sure it is manually activated from the redpi interface
+        self.rp = self._launch_scpi_server()
+        
         # decimation factors of 1, 8, 64, 1024, 8192, 65536 are accepter with
-        # original redpitaya software
+        # original redpitaya software, otherwise an error is raised
         self.decimation = decimation
         
         self.rp.tx_txt('ACQ:DEC ' + str(self.decimation))
@@ -93,6 +121,10 @@ class RedPitaya:
         self.num_of_avg = num_of_avg
         self.offset = offset # the offset takes a certain number of spectra in the beginning. 
                              # Sometimes the Red Pitaya produces trash in the first spectra
+                             
+    def _launch_scpi_server(self):
+        server = scpi(self.IP)
+        return server
 
     def acquire(self):
         # do the acquisitions and save it in the computers memory (not on the Red Pitaya).

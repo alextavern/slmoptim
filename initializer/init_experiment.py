@@ -1,8 +1,8 @@
 from slmPy import slmpy
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
-from utils.download import ZeluxCamera, RedPitayaSCPI
-from utils.upload import SpatialLightModulator
+from ..utils.download import ZeluxCamera, RedPitaya
+from ..utils.upload import SpatialLightModulator
 
 
 # inspired by this simple illustration of the factory method design pattern in python
@@ -31,7 +31,7 @@ class InitExperiment:
         HARDWARE_TYPE_TO_CLASS_MAP = {
             'slmpy': SpatialLightModulator,
             'ccd':  ZeluxCamera,
-            'redpi': RedPitayaSCPI,
+            'redpi': RedPitaya,
         }
         
         if hardware_type not in HARDWARE_TYPE_TO_CLASS_MAP:
