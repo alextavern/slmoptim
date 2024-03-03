@@ -17,53 +17,38 @@ class IterationAlgos():
         and Hadamard Partition (HPA) algorithms. 
     """
     
-    def __init__(self, 
-                 slm, 
-                 camera,
-                 pattern_loader,
-                 daq=None,
-                 total_iterations=1,
-                 slm_resolution=(800, 600),
-                 slm_segments=256,
-                 slm_macropixel=5, 
-                 slm_calibration_pixel=112,
-                 phase_steps=8,
-                 type="cont",
-                 remote=True,
-                 save_path=None):
+    def __init__(self, slm, camera, pattern_loader, daq=None, **config):
         
         self.slm = slm
         self.camera = camera
         self.daq = daq
+        self.pattern_loader = pattern_loader
         
-        self.total_iterations = total_iterations
+        self.total_iterations = config['method'].get('iterations', 1)
+        self.type = config['method'].get('type')
+        self.m = config['method'].get('phase_steps', 8)
+
 
         # slm settings
+        slm_segments = config['slm'].get('controlled_segments_', 256)
         self.N = int(slm_segments ** 0.5)
-        self.slm_macropixel = slm_macropixel
-        self.calib_px = slm_calibration_pixel
+        self.slm_macropixel = config['slm'].get('macropixel', 20)
+        self.calib_px = config['slm'].get('gray_calibration', 112)
         
         self.pattern_loader = pattern_loader
-                
-        self.m = phase_steps
-        
+                        
         # SLM
-        resX, resY = slm_resolution
+        resX, resY = config['slm'].get('resolution', (800, 600))
         self.patternSLM = pt.PatternsBacic(resX, resY)
-        
-        # is the slm remotely connected to a rasp pi ?
-        self.remote = remote
-
-        # the type of the iteration algorithm        
-        self.type = type
-        
+                
         # save raw data path
-        self.save_path = save_path
+        self.save_path = config.get('path', None)
         
         # define a filename
         self.filepath = types.MethodType(create_filepath, self)
         # self.filepath = self._create_filepath()
      
+ 
     def register_callback(self, callback):
         """ This callback function is used to pass a custom cost function
             to the optimization object
@@ -223,13 +208,14 @@ class ContinuousSequential(IterationAlgos):
                         frame = self.camera.get()
                         # get spectrum from daq
                         if self.daq:
-                            spectrum = self.daq.get()
+                            raw, fft = self.daq.acquire()
+                            df, _ = self.daq.calc_fft()
 
                         # calculate correlation here
-                            corr_k = self.callback(spectrum)
-                            corr.append(corr_k)
+                            corr_k = self.callback(fft)
                         else:
                             corr_k = self.callback(frame)
+                        corr.append(corr_k)
 
                     counter += 1 
                     self.frames[counter] = frame

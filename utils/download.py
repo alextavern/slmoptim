@@ -17,7 +17,7 @@ class PropheseeCamera():
 class ZeluxCamera():
     
     def __init__(self, **kwargs):
-
+        print("Zelux camera initiliazed - use init_cam() to arm and trigger it and get() to get frames")
         # camera settings
         self.roi_size = kwargs.get('roi_size', 100)
         self.roi_off = kwargs.get('roi_off', (0, 0))
@@ -94,34 +94,33 @@ class ZeluxCamera():
     
 
 class RedPitaya:
-    
-    def __init__(self, IP_address='172.24.40.69', num_of_samples=16384, clock=125e6, decimation=8192, channel=1, num_of_avg=10, offset=5):
-        
+
+    def __init__(self, **kwargs):
         # pass arguments
-        self.IP = IP_address 
-        self.num_of_samples = num_of_samples
-        self.clock = clock
-        self.channel = channel
+        self.IP = kwargs.get('IP', '172.24.40.69')
+        self.num_of_samples = kwargs.get('number_of_samples', 16384)
+        self.clock = kwargs.get('clock', 125 * 1e6)
+        self.channel = kwargs.get('source', 2)
         
         # launch scpi server - make sure it is manually activated from the redpi interface
         self.rp = self._launch_scpi_server()
         
-        # decimation factors of 1, 8, 64, 1024, 8192, 65536 are accepter with
+        # decimation factors of 1, 8, 64, 1024, 8192, 65536 are accepted with the
         # original redpitaya software, otherwise an error is raised
-        self.decimation = decimation
-        
+        self.decimation = kwargs.get('decimation', 8192)
         self.rp.tx_txt('ACQ:DEC ' + str(self.decimation))
         
         # make sure the decimation was set
         self.rp.tx_txt('ACQ:DEC?')
-        display('Decimation set to: ' + str(self.rp.rx_txt()))
-        
+        # display('Decimation set to: ' + str(self.rp.rx_txt()))
+        print('Red Pitaya daq loaded - decimation set to: ' + str(self.rp.rx_txt()))
+
         # prepare buffer dataframes
         self.buff_ffts = pd.DataFrame()
         self.buffs = pd.DataFrame()
         
-        self.num_of_avg = num_of_avg
-        self.offset = offset # the offset takes a certain number of spectra in the beginning. 
+        self.num_of_avg = kwargs.get('number_of_avg', 10)
+        self.offset = kwargs.get('offset', 2) # the offset takes a certain number of spectra in the beginning. 
                              # Sometimes the Red Pitaya produces trash in the first spectra
                              
     def _launch_scpi_server(self):
@@ -132,7 +131,8 @@ class RedPitaya:
         # do the acquisitions and save it in the computers memory (not on the Red Pitaya).
         for i in range(1, self.num_of_avg + self.offset):
             if i % 50 == 0:
-                display(i)
+                print(i)
+                # display(i)
             self.rp.tx_txt('ACQ:START')
             self.rp.tx_txt('ACQ:TRIG NOW')
             self.rp.tx_txt('ACQ:SOUR' + str(self.channel) + ':DATA?')
@@ -195,7 +195,6 @@ class RedPitaya:
         ax.set_yscale('log')
         if log: ax.set_xscale('log')
         ax.legend(loc='upper right', bbox_to_anchor=(1, 1), prop={'size': 8})
-
         return fft_df, fig
     
         
