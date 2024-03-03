@@ -7,6 +7,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from .redpitaya_scpi import scpi
+from slmPy import slmpy
+
+class PropheseeCamera():
+    
+    def __init__(self) -> None:
+        pass
 
 class ZeluxCamera():
     
@@ -85,21 +91,17 @@ class ZeluxCamera():
         image_buffer = np.copy(frame.image_buffer)
         
         return image_buffer
-        
-# class RedPitayaSCPI:
-
-#     def launch(IP_address):
-#         server = scpi.scpi(IP_address)
-#         return server
+    
 
 class RedPitaya:
     
-    def __init__(self, IP_address='172.24.40.69', num_of_samples=16384, clock=125e6, decimation=8192, num_of_avg=10, offset=5):
+    def __init__(self, IP_address='172.24.40.69', num_of_samples=16384, clock=125e6, decimation=8192, channel=1, num_of_avg=10, offset=5):
         
         # pass arguments
         self.IP = IP_address 
         self.num_of_samples = num_of_samples
         self.clock = clock
+        self.channel = channel
         
         # launch scpi server - make sure it is manually activated from the redpi interface
         self.rp = self._launch_scpi_server()
@@ -133,8 +135,7 @@ class RedPitaya:
                 display(i)
             self.rp.tx_txt('ACQ:START')
             self.rp.tx_txt('ACQ:TRIG NOW')
-            self.rp.tx_txt('ACQ:SOUR1:DATA?')
-
+            self.rp.tx_txt('ACQ:SOUR' + str(self.channel) + ':DATA?')
             buff_string = ''
             buff_string = self.rp.rx_txt()
             buff_string = buff_string.strip('{}\n\r').replace("  ", "").split(',')

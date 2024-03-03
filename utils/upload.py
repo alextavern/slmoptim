@@ -3,6 +3,7 @@ from ..loader import patterns as pt
 from tqdm.auto import tqdm
 import numpy as np
 import time, cv2
+from slmPy import slmpy
 
 
 def set_mirror(slm, resolution=(800, 600)):

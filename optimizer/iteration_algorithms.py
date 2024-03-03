@@ -19,8 +19,9 @@ class IterationAlgos():
     
     def __init__(self, 
                  slm, 
-                 input_hardware,
+                 camera,
                  pattern_loader,
+                 daq=None,
                  total_iterations=1,
                  slm_resolution=(800, 600),
                  slm_segments=256,
@@ -32,7 +33,8 @@ class IterationAlgos():
                  save_path=None):
         
         self.slm = slm
-        self.camera = input_hardware
+        self.camera = camera
+        self.daq = daq
         
         self.total_iterations = total_iterations
 
@@ -219,10 +221,15 @@ class ContinuousSequential(IterationAlgos):
                         # get interferogram from camera
                         # frame = self.get_frame()
                         frame = self.camera.get()
+                        # get spectrum from daq
+                        if self.daq:
+                            spectrum = self.daq.get()
 
                         # calculate correlation here
-                        corr_k = self.callback(frame)
-                        corr.append(corr_k)
+                            corr_k = self.callback(spectrum)
+                            corr.append(corr_k)
+                        else:
+                            corr_k = self.callback(frame)
 
                     counter += 1 
                     self.frames[counter] = frame
