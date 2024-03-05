@@ -27,21 +27,23 @@ from ..utils.upload import SpatialLightModulator
     
 class InitExperiment():
     
-    def __init__(self, **config):
+    def __init__(self, auto=False, **config):
         
-        # this for-loop has the dictionary keys hard-coded
-        # if there is a change in the config.yaml file
-        # these changes must be made here too
-        self.components = []
-        for component in config['hardware']:
-            class_name = config['hardware'][component]['name'] # extract the class names
-            hardware_params = config['hardware'][component]['params'] # extract hardware params
+            if auto:
+            # this for-loop has the dictionary keys hard-coded
+            # if there is a change in the config.yaml file
+            # these changes must be made here too
+                for component in config['hardware']:
+                    class_name = config['hardware'][component]['name'] # extract the class names
+                    hardware_params = config['hardware'][component]['params'] # extract hardware params
 
-            new_hardware = self.create_hardware(class_name, **hardware_params)
+                    new_hardware = self.create_hardware(class_name, **hardware_params)
 
-            setattr(self, component, new_hardware) # set the class as an attrinute of this class
-            self.components.append(component)
+                    setattr(self, component, new_hardware) # sets the instanitated class as an attrinute of this class
 
+            else: 
+                pass
+            
     @classmethod
     def create_hardware(cls, hardware_type, **params):
         """ Creates a hardware object by instantiating its corresponding class.

@@ -41,3 +41,6 @@ def snr(frame, mask_radius=8, mask_offset=(0, 0), intesity_only=False):
         cost = signal / noise
 
     return cost    
+
+def maximize_spectrum(spectrum):
+    return np.max(spectrum)

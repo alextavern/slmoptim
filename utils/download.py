@@ -130,8 +130,8 @@ class RedPitaya:
     def acquire(self):
         # do the acquisitions and save it in the computers memory (not on the Red Pitaya).
         for i in range(1, self.num_of_avg + self.offset):
-            if i % 50 == 0:
-                print(i)
+            # if i % 50 == 0:
+            #     print(i)
                 # display(i)
             self.rp.tx_txt('ACQ:START')
             self.rp.tx_txt('ACQ:TRIG NOW')
@@ -141,7 +141,7 @@ class RedPitaya:
             buff_string = buff_string.strip('{}\n\r').replace("  ", "").split(',')
             #display(buff_string)
             self.buffs[i] = list(map(float, buff_string))
-            self.buff_ffts[i] = (np.fft.fft(self.buffs[i]) / self.num_of_samples)**2
+            self.buff_ffts[i] = (np.fft.fft(self.buffs[i]) / self.num_of_samples)**2 # it is squared to convert to power
             
         return self.buffs, self.buff_ffts
         
@@ -166,8 +166,12 @@ class RedPitaya:
         self.freq2plot = self.freq[0:int(self.freq.size / 2)]
         
         return self.freq, self.freq2plot
-        
-            
+    
+    @staticmethod
+    def _psd2dBm(power):
+        dBm = 10 * np.log10(power / (0.001 * 50))
+        return dBm
+    
     def calc_fft(self, freq_range=(100, 1500), log=True):
         
         freq_min, freq_max = freq_range
@@ -178,25 +182,31 @@ class RedPitaya:
         for i in range(2 + self.offset, self.num_of_avg + self.offset):
             fft_avgd = fft_avgd + 2 * np.abs(self.buff_ffts[i][0:int(self.freq.size / 2)]) / self.num_of_avg
         
-
+        fft_avgd_dBm = self._psd2dBm(fft_avgd) 
+        
         # put it into a dataframe in order to easier select the frequency range
-        fft_df = pd.DataFrame({'Freq': self.freq2plot, 'FFT': np.sqrt(fft_avgd)})
+        self.fft_df = pd.DataFrame({'Freq': self.freq2plot, 'FFT': fft_avgd_dBm})
         # select frequency range
-        fft_df = fft_df[(fft_df['Freq'] >= freq_min) & (fft_df['Freq'] <= freq_max)]
+        self.fft_df = self.fft_df[(self.fft_df['Freq'] >= freq_min) & (self.fft_df['Freq'] <= freq_max)]
 
-        # plot
+ 
+        return self.fft_df['FFT'], self.fft_df
+    
+    def plot_fft(self, freq_range=(1, 100e6), logx=False):
+        freq_min, freq_max = freq_range
+
         fig, ax = plt.subplots(figsize=(4, 2))
-        fft_df.plot(x='Freq', y='FFT', ax=ax)
+        self.fft_df.plot(x='Freq', y='FFT', ax=ax)
         # ax.plot(self.freq2plot, np.sqrt(fft_avgd), label='Current Circuit')
 
-        ax.set_title('Noise Amplitude Spectrum (' + str(self.num_of_avg) + ' average)');
-        ax.set_xlabel('Freqency (Hz)')
-        ax.set_ylabel('Noise amplitude. (V/$\sqrt{Hz}$)')
-        ax.set_yscale('log')
-        if log: ax.set_xscale('log')
+        ax.set_title('Power Density Spectrum (' + str(self.num_of_avg) + ' average)');
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel('Displacement (dBm)')
+        # ax.set_yscale('log')
+        if logx: ax.set_xscale('log')
         ax.legend(loc='upper right', bbox_to_anchor=(1, 1), prop={'size': 8})
-        return fft_df, fig
     
+        return fig
         
 class FrameAcquisitionThread(threading.Thread):
     

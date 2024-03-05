@@ -19,26 +19,22 @@ class IterationAlgos():
     
     def __init__(self, slm, camera, pattern_loader, daq=None, **config):
         
+        # hardware objects
         self.slm = slm
         self.camera = camera
         self.daq = daq
+        
+        # pattern loader
         self.pattern_loader = pattern_loader
         
-        self.total_iterations = config['method'].get('iterations', 1)
-        self.type = config['method'].get('type')
-        self.m = config['method'].get('phase_steps', 8)
+        # general parameters
+        self._get_params(**config['method'])
 
+        # SLM settings
+        self._get_params(**config['hardware']['slm']['params'])
+        self.N = int(self.slm_segments ** 0.5)
 
-        # slm settings
-        slm_segments = config['slm'].get('controlled_segments_', 256)
-        self.N = int(slm_segments ** 0.5)
-        self.slm_macropixel = config['slm'].get('macropixel', 20)
-        self.calib_px = config['slm'].get('gray_calibration', 112)
-        
-        self.pattern_loader = pattern_loader
-                        
-        # SLM
-        resX, resY = config['slm'].get('resolution', (800, 600))
+        resX, resY = self.resolution
         self.patternSLM = pt.PatternsBacic(resX, resY)
                 
         # save raw data path
@@ -48,6 +44,11 @@ class IterationAlgos():
         self.filepath = types.MethodType(create_filepath, self)
         # self.filepath = self._create_filepath()
      
+    def _get_params(self, **config):
+        for key, value in config.items():
+            setattr(self, key, value) # sets the instanitated class as an attrinute of this class
+
+            
  
     def register_callback(self, callback):
         """ This callback function is used to pass a custom cost function
@@ -71,7 +72,7 @@ class IterationAlgos():
         -------
         phi (int) calibrated for the SLM
         """
-        return (2 * (k + 1) / self.m) * self.calib_px / 2
+        return (2 * (k + 1) / self.phase_steps) * self.gray_calibration / 2
     
     def create_pattern(self, k, mask, pattern):
         """ Prepares a pattern ready for the SLM: enlarges it according to the 
@@ -79,10 +80,7 @@ class IterationAlgos():
         """
         phi = self.phi_k(k)
         pattern[mask] = phi
-        # temp = self.patternSLM.pattern2SLM(pattern, self.slm_macropixel)
-        # temp = self.patternSLM._enlarge_pattern(pattern, self.slm_macropixel)
-        # temp = self.patternSLM.add_subpattern(temp)
-        temp = self.patternSLM.pattern_to_SLM(pattern, self.slm_macropixel)
+        temp = self.patternSLM.pattern_to_SLM(pattern, self.macropixel)
         return temp
 
     def upload_pattern(self, pattern, slm_delay=0.1):
@@ -94,14 +92,6 @@ class IterationAlgos():
         else:
             self.slm.updateArray(pattern)
         time.sleep(slm_delay)
-        
-    
-    # def get_frame(self):
-    #     """ Get frame from zelux thorlabs camera
-    #     """
-    #     frame = self.camera.get_pending_frame_or_null()
-    #     image_buffer = np.copy(frame.image_buffer)
-    #     return image_buffer
     
     def _create_filepath(self):
         """ Creates a directory and a filename to save raw data
@@ -121,14 +111,13 @@ class IterationAlgos():
         filename = '{}_optim_raw_data_{}_slm_segs{}_slm_macro{}.'.format(timestr,
                                                                             self.type,
                                                                             self.N ** 2, 
-                                                                            self.slm_macropixel)
+                                                                            self.macropixel)
         if self.save_path:
             self.filepath = os.path.join(new_path, filename)
         else:
             self.filepath = self.filename
             
         return self.filepath
-    
     
     def save_raw(self):      
 
@@ -177,7 +166,6 @@ class IterationAlgos():
         """ The following classes can be condensed into only one in principle. To do. 
         """
 class ContinuousSequential(IterationAlgos):
-    
         
     def run(self):
         
@@ -196,7 +184,7 @@ class ContinuousSequential(IterationAlgos):
                     temp_pattern = self.final_pattern.copy()
                     corr = []
                     # sweep phase at each pixel
-                    for k in np.arange(0, self.m):
+                    for k in np.arange(0, self.phase_steps):
                         # create pattern, i.e one pattern for each phase value
                         temp = self.create_pattern(k, mask, temp_pattern)
 
@@ -208,8 +196,8 @@ class ContinuousSequential(IterationAlgos):
                         frame = self.camera.get()
                         # get spectrum from daq
                         if self.daq:
-                            raw, fft = self.daq.acquire()
-                            df, _ = self.daq.calc_fft()
+                            self.daq.acquire()
+                            fft, _ = self.daq.calc_fft((3000, 5000))
 
                         # calculate correlation here
                             corr_k = self.callback(fft)
@@ -218,6 +206,7 @@ class ContinuousSequential(IterationAlgos):
                         corr.append(corr_k)
 
                     counter += 1 
+                    print(counter, np.max(corr))
                     self.frames[counter] = frame
 
                     # update pattern with max corr
@@ -252,7 +241,7 @@ class StepwiseSequential(IterationAlgos):
             for _, mask, _ in tqdm((self.pattern_loader)):               
                 corr = []
                 # sweep phase at each pixel
-                for k in np.arange(0, self.m):
+                for k in np.arange(0, self.phase_steps):
                     # create pattern, i.e one pattern for each phase value
                     temp = self.create_pattern(k, mask, temp_pattern)
                     # upload pattern to slm
@@ -300,7 +289,7 @@ class RandomPartition(IterationAlgos):
                     plt.colorbar()
                     corr = []
                     # sweep phase at each pixel
-                    for k in np.arange(0, self.m):
+                    for k in np.arange(0, self.phase_steps):
                         # create pattern, i.e one pattern for each phase value
                         temp = self.create_pattern(k, mask, temp_pattern)
 
@@ -373,7 +362,7 @@ class CoefficientsOptimization(IterationAlgos):
         # SLM
         resX, resY = slm_resolution
         self.patternSLM = pt.PatternsBacic(resX, resY)
-        self.calib_px = slm_calibration_pixel
+        self.gray_calibration = slm_calibration_pixel
         self.shape = slm_resolution
         
         # Zernike
@@ -471,7 +460,7 @@ class CoefficientsOptimization(IterationAlgos):
         # arg2pi = (arg + 2 * np.pi) % (2 * np.pi)
         arg2pi = arg + np.pi
         # normalize to SLM 2pi calibration value
-        arg2SLM = arg2pi * self.calib_px / (2 * np.pi) 
+        arg2SLM = arg2pi * self.gray_calibration / (2 * np.pi) 
         
         return arg2SLM.astype('uint8')
         
