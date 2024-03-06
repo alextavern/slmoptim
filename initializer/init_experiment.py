@@ -36,7 +36,6 @@ class InitExperiment():
                 for component in config['hardware']:
                     class_name = config['hardware'][component]['name'] # extract the class names
                     hardware_params = config['hardware'][component]['params'] # extract hardware params
-
                     new_hardware = self.create_hardware(class_name, **hardware_params)
 
                     setattr(self, component, new_hardware) # sets the instanitated class as an attrinute of this class
@@ -75,5 +74,8 @@ class InitExperiment():
         
         if hardware_type not in HARDWARE_TYPE_TO_CLASS_MAP:
             raise ValueError('Bad hardware type {}'.format(hardware_type))
+        
+        print('{} parameters are:'.format(hardware_type))
+        print(params)
     
         return HARDWARE_TYPE_TO_CLASS_MAP[hardware_type](**params)

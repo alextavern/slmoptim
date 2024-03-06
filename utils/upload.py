@@ -20,23 +20,14 @@ class SpatialLightModulator():
     def __init__(self, **config):
         
         print("SLM initiliazed - use init_slm() to launch it")
-
-        
-        # slm settings
-        # self.remote = kwargs.get('remote', True)
-        # self.SERVER = kwargs.get('server', '10.42.0.234')
-        # self.monitor = kwargs.get('monitor', 1)
-        
-        
-        slm_config = config['hardware']['slm']['params']
-        get_params(self, **slm_config)
+        get_params(self, **config)
         
     def init_slm(self):
         """ initializes slmpy SLM
         """
         if self.remote:
             self.slm = slmpy.Client()
-            self.slm.start(self.SERVER)
+            self.slm.start(self.server)
         else:    
             self.slm = slmpy.SLMdisplay(self.monitor)
         return self.slm
