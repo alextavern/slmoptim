@@ -44,3 +44,6 @@ def snr(frame, mask_radius=8, mask_offset=(0, 0), intesity_only=False):
 
 def maximize_spectrum(spectrum):
     return np.max(spectrum)
+
+def peak_2_peak(time_series):
+    return np.ptp(time_series)

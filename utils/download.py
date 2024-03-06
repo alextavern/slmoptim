@@ -127,7 +127,7 @@ class RedPitaya:
         server = scpi(self.IP)
         return server
 
-    def acquire(self):
+    def acquire(self, fourier=False):
         # do the acquisitions and save it in the computers memory (not on the Red Pitaya).
         for i in range(1, self.num_of_avg + self.offset):
             # if i % 50 == 0:
@@ -141,9 +141,12 @@ class RedPitaya:
             buff_string = buff_string.strip('{}\n\r').replace("  ", "").split(',')
             #display(buff_string)
             self.buffs[i] = list(map(float, buff_string))
-            self.buff_ffts[i] = (np.fft.fft(self.buffs[i]) / self.num_of_samples)**2 # it is squared to convert to power
+            if fourier:
+                self.buff_ffts[i] = (np.fft.fft(self.buffs[i]) / self.num_of_samples)**2 # it is squared to convert to power
             
-        return self.buffs, self.buff_ffts
+        # return self.buffs, self.buff_ffts
+        return self.buffs
+
         
     def plot_timetrace(self, idx=1):
         

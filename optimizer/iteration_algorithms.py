@@ -196,11 +196,11 @@ class ContinuousSequential(IterationAlgos):
                         frame = self.camera.get()
                         # get spectrum from daq
                         if self.daq:
-                            self.daq.acquire()
-                            fft, _ = self.daq.calc_fft((3000, 5000))
+                            raw = self.daq.acquire()
+                            # fft, _ = self.daq.calc_fft((3000, 5000))
 
                         # calculate correlation here
-                            corr_k = self.callback(fft)
+                            corr_k = self.callback(raw)
                         else:
                             corr_k = self.callback(frame)
                         corr.append(corr_k)
