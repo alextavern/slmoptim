@@ -1,0 +1,40 @@
+method:
+  type: csa
+  total_iterations: 1
+  phase_steps: 8
+  path: '/home/optomeca/Documents/measurements'
+
+hardware: 
+  slm:
+    name: slmpy
+    params: 
+      resolution: [800, 600]
+      slm_segments: 256
+      macropixel: 20
+      offset: [0, 0]
+      gray_calibration: 112
+      remote: True
+      server: '10.42.0.234'
+      monitor: 1
+
+  camera:
+    name: ccd
+    params:
+      roi_size: 600
+      offset: [0, 0]
+      macropixel: 4
+      exposure_time: 100
+      gain: 1
+      timeout: 100
+  
+  daq:
+    name: redpi
+    params:
+      IP: '172.24.40.32'
+      IP2: '172.24.40.69'
+      number_of_samples: 16384
+      clock: 125000000
+      decimation: 8192
+      number_of_avg: 2
+      offset: 1
+      source: 2

@@ -43,7 +43,9 @@ def snr(frame, mask_radius=8, mask_offset=(0, 0), intesity_only=False):
     return cost    
 
 def maximize_spectrum(spectrum):
+    """ Takes an FFT series and returns its maximum"""
     return np.max(spectrum)
 
 def peak_2_peak(time_series):
+    """ Take a times series and returns the peak to peak voltage"""
     return np.ptp(time_series)

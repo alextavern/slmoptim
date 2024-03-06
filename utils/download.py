@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from .redpitaya_scpi import scpi
 from slmPy import slmpy
+from .misc import get_params
 
 class PropheseeCamera():
     
@@ -16,15 +17,18 @@ class PropheseeCamera():
 
 class ZeluxCamera():
     
-    def __init__(self, **kwargs):
+    def __init__(self, **config):
         print("Zelux camera initiliazed - use init_cam() to arm and trigger it and get() to get frames")
         # camera settings
-        self.roi_size = kwargs.get('roi_size', 100)
-        self.roi_off = kwargs.get('roi_off', (0, 0))
-        self.bins = kwargs.get('bins', 1)
-        self.exposure_time = kwargs.get('exposure_time', 100)
-        self.gain = kwargs.get('gain', 1)
-        self.timeout = kwargs.get('timeout', 100)
+        # self.roi_size = kwargs.get('roi_size', 100)
+        # self.offset = kwargs.get('offset', (0, 0))
+        # self.bins = kwargs.get('bins', 1)
+        # self.exposure_time = kwargs.get('exposure_time', 100)
+        # self.gain = kwargs.get('gain', 1)
+        # self.timeout = kwargs.get('timeout', 100)
+        
+        cam_config = config['hardware']['camera']['params']
+        get_params(self, **cam_config)
     
     def set_roi(self):
         """ Calculates the Region of interest. The user gives a window size and x, y offsets from
@@ -40,7 +44,7 @@ class ZeluxCamera():
             width = self.roi_size
             height = width
             
-        offset_x, offset_y = self.roi_off
+        offset_x, offset_y = self.offset
         middle_x = int(1440 / 2) + offset_x
         middle_y = int(1080 / 2) - offset_y
 
@@ -95,19 +99,22 @@ class ZeluxCamera():
 
 class RedPitaya:
 
-    def __init__(self, **kwargs):
+    def __init__(self, **config):
         # pass arguments
-        self.IP = kwargs.get('IP', '172.24.40.69')
-        self.num_of_samples = kwargs.get('number_of_samples', 16384)
-        self.clock = kwargs.get('clock', 125 * 1e6)
-        self.channel = kwargs.get('source', 2)
+        # self.IP = kwargs.get('IP', '172.24.40.69')
+        # self.num_of_samples = kwargs.get('number_of_samples', 16384)
+        # self.clock = kwargs.get('clock', 125 * 1e6)
+        # self.channel = kwargs.get('source', 2)
+        
+        daq_config = config['hardware']['daw']['params']
+        get_params(self, **daq_config)
         
         # launch scpi server - make sure it is manually activated from the redpi interface
         self.rp = self._launch_scpi_server()
         
         # decimation factors of 1, 8, 64, 1024, 8192, 65536 are accepted with the
         # original redpitaya software, otherwise an error is raised
-        self.decimation = kwargs.get('decimation', 8192)
+        # self.decimation = kwargs.get('decimation', 8192)
         self.rp.tx_txt('ACQ:DEC ' + str(self.decimation))
         
         # make sure the decimation was set
@@ -119,9 +126,9 @@ class RedPitaya:
         self.buff_ffts = pd.DataFrame()
         self.buffs = pd.DataFrame()
         
-        self.num_of_avg = kwargs.get('number_of_avg', 10)
-        self.offset = kwargs.get('offset', 2) # the offset takes a certain number of spectra in the beginning. 
-                             # Sometimes the Red Pitaya produces trash in the first spectra
+        # self.num_of_avg = kwargs.get('number_of_avg', 10)
+        # self.offset = kwargs.get('offset', 2) # the offset takes a certain number of spectra in the beginning. 
+        #                      # Sometimes the Red Pitaya produces trash in the first spectra
                              
     def _launch_scpi_server(self):
         server = scpi(self.IP)

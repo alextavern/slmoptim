@@ -1,10 +1,15 @@
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from slmPy import slmpy
-from ..utils import camera_func as cam
+from . import camera_func as cam
 import matplotlib.pyplot as plt
 from ..loader import patterns as  pt
 import numpy as np
 import time, pickle, os
+
+
+def get_params(self, **config):
+
+    for key, value in config.items():
+        setattr(self, key, value) # sets the instanitated class as an attrinute of this class            
 
 def pattern_frame(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600),
                   off=(0, 0), 

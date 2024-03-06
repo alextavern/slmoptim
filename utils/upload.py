@@ -4,6 +4,7 @@ from tqdm.auto import tqdm
 import numpy as np
 import time, cv2
 from slmPy import slmpy
+from ..utils.misc import get_params
 
 
 def set_mirror(slm, resolution=(800, 600)):
@@ -16,15 +17,19 @@ def set_mirror(slm, resolution=(800, 600)):
     
 class SpatialLightModulator():
     
-    def __init__(self, **kwargs):
+    def __init__(self, **config):
         
         print("SLM initiliazed - use init_slm() to launch it")
 
         
         # slm settings
-        self.remote = kwargs.get('remote', True)
-        self.SERVER = kwargs.get('server', '10.42.0.234')
-        self.monitor = kwargs.get('monitor', 1)
+        # self.remote = kwargs.get('remote', True)
+        # self.SERVER = kwargs.get('server', '10.42.0.234')
+        # self.monitor = kwargs.get('monitor', 1)
+        
+        
+        slm_config = config['hardware']['slm']['params']
+        get_params(self, **slm_config)
         
     def init_slm(self):
         """ initializes slmpy SLM
@@ -38,36 +43,7 @@ class SpatialLightModulator():
     
     def close_slm(self):
         self.slm.close()
-        
-                 
-# class SpatialLightModulator():
-    
-#     def __init__(self,
-#                  remote=True,
-#                  SERVER = '10.42.0.234', 
-#                  monitor=1):
-        
-#         # slm settings
-#         self.remote = remote
-#         self.SERVER = SERVER
-#         self.monitor = monitor
-        
-#     def init_slm(self):
-#         """ initializes slmpy SLM
-#         """
-#         if self.remote:
-#             self.slm = slmpy.Client()
-#             self.slm.start(self.SERVER)
-#         else:    
-#             self.slm = slmpy.SLMdisplay(self.monitor)
-#         return self.slm
-    
-#     def close_slm(self):
-#         self.slm.close()
-
-   
-    
-    
+            
 class SlmUploadPatternsThread(threading.Thread):
     
     def __init__(self, slm, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, num_in=16, slm_macropixel_size=5, path=None):
