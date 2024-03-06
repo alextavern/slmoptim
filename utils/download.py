@@ -3,9 +3,213 @@ from typing import Any
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 import threading
 import numpy as np
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from .redpitaya_scpi import scpi
+from slmPy import slmpy
 
+class PropheseeCamera():
+    
+    def __init__(self) -> None:
+        pass
+
+class ZeluxCamera():
+    
+    def __init__(self, **kwargs):
+        print("Zelux camera initiliazed - use init_cam() to arm and trigger it and get() to get frames")
+        # camera settings
+        self.roi_size = kwargs.get('roi_size', 100)
+        self.roi_off = kwargs.get('roi_off', (0, 0))
+        self.bins = kwargs.get('bins', 1)
+        self.exposure_time = kwargs.get('exposure_time', 100)
+        self.gain = kwargs.get('gain', 1)
+        self.timeout = kwargs.get('timeout', 100)
+    
+    def set_roi(self):
+        """ Calculates the Region of interest. The user gives a window size and x, y offsets from
+            the sensor center
+
+        Returns
+        -------
+        roi (tuple or int)
+        """
+        if type(self.roi_size) is tuple:
+            width, height = self.roi_size
+        else:
+            width = self.roi_size
+            height = width
+            
+        offset_x, offset_y = self.roi_off
+        middle_x = int(1440 / 2) + offset_x
+        middle_y = int(1080 / 2) - offset_y
+
+        roi = (middle_x - int(width/ 2), 
+            middle_y - int(height / 2), 
+            middle_x + int(width / 2), 
+            middle_y + int(height / 2))
+        
+        return roi
+    
+    def init_cam(self):
+        """ Initializes and sets camera parameters
+        """
+        # camera instance
+        self.sdk = TLCameraSDK()
+        available_cameras = self.sdk.discover_available_cameras()
+        self.camera = self.sdk.open_camera(available_cameras[0])
+
+        # configure
+        self.camera.exposure_time_us = self.exposure_time  # set exposure to 11 ms
+        self.camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode
+        self.camera.image_poll_timeout_ms = self.timeout  # 1 second polling timeout
+        self.camera.roi = self.set_roi()
+
+        # set binning for camera macropixels
+        (self.camera.binx, self.camera.biny) = (self.bins, self.bins)
+
+        if self.camera.gain_range.max > self.gain:
+            db_gain = self.gain
+            gain_index = self.camera.convert_decibels_to_gain(db_gain)
+            self.camera.gain = gain_index
+
+        # arm - trigger
+        self.camera.arm(2)
+        self.camera.issue_software_trigger()
+        
+        return self.camera
+    
+    def close_cam(self):
+        self.camera.disarm()
+        self.camera.dispose()
+        self.sdk.dispose()  
+        
+    def get(self):
+        """ Get frame from zelux thorlabs camera
+        """
+        frame = self.camera.get_pending_frame_or_null()
+        image_buffer = np.copy(frame.image_buffer)
+        
+        return image_buffer
+    
+
+class RedPitaya:
+
+    def __init__(self, **kwargs):
+        # pass arguments
+        self.IP = kwargs.get('IP', '172.24.40.69')
+        self.num_of_samples = kwargs.get('number_of_samples', 16384)
+        self.clock = kwargs.get('clock', 125 * 1e6)
+        self.channel = kwargs.get('source', 2)
+        
+        # launch scpi server - make sure it is manually activated from the redpi interface
+        self.rp = self._launch_scpi_server()
+        
+        # decimation factors of 1, 8, 64, 1024, 8192, 65536 are accepted with the
+        # original redpitaya software, otherwise an error is raised
+        self.decimation = kwargs.get('decimation', 8192)
+        self.rp.tx_txt('ACQ:DEC ' + str(self.decimation))
+        
+        # make sure the decimation was set
+        self.rp.tx_txt('ACQ:DEC?')
+        # display('Decimation set to: ' + str(self.rp.rx_txt()))
+        print('Red Pitaya daq loaded - decimation set to: ' + str(self.rp.rx_txt()))
+
+        # prepare buffer dataframes
+        self.buff_ffts = pd.DataFrame()
+        self.buffs = pd.DataFrame()
+        
+        self.num_of_avg = kwargs.get('number_of_avg', 10)
+        self.offset = kwargs.get('offset', 2) # the offset takes a certain number of spectra in the beginning. 
+                             # Sometimes the Red Pitaya produces trash in the first spectra
+                             
+    def _launch_scpi_server(self):
+        server = scpi(self.IP)
+        return server
+
+    def acquire(self, fourier=False):
+        # do the acquisitions and save it in the computers memory (not on the Red Pitaya).
+        for i in range(1, self.num_of_avg + self.offset):
+            # if i % 50 == 0:
+            #     print(i)
+                # display(i)
+            self.rp.tx_txt('ACQ:START')
+            self.rp.tx_txt('ACQ:TRIG NOW')
+            self.rp.tx_txt('ACQ:SOUR' + str(self.channel) + ':DATA?')
+            buff_string = ''
+            buff_string = self.rp.rx_txt()
+            buff_string = buff_string.strip('{}\n\r').replace("  ", "").split(',')
+            #display(buff_string)
+            self.buffs[i] = list(map(float, buff_string))
+            if fourier:
+                self.buff_ffts[i] = (np.fft.fft(self.buffs[i]) / self.num_of_samples)**2 # it is squared to convert to power
+            
+        # return self.buffs, self.buff_ffts
+        return self.buffs
 
         
+    def plot_timetrace(self, idx=1):
+        
+        x = np.arange(0, self.decimation / self.clock * self.num_of_samples, self.decimation / self.clock)
+
+        fig, ax = plt.subplots(figsize=(4, 3))
+        ax.plot(x * 1000, self.buffs[idx] * 1000, label='', lw=1)
+        ax.set_title('raw time trace');
+        ax.set_xlabel('Time (ms)')
+        ax.set_ylabel('Voltage (mV)')
+
+        return fig
+            
+    def _calc_fftfreq(self):
+        # determine the timestep to calculate the frequency axis
+        timestep = self.decimation / self.clock
+        
+        # get the frequencies
+        self.freq = pd.Series(np.fft.fftfreq(self.num_of_samples, d=timestep))
+        self.freq2plot = self.freq[0:int(self.freq.size / 2)]
+        
+        return self.freq, self.freq2plot
+    
+    @staticmethod
+    def _psd2dBm(power):
+        dBm = 10 * np.log10(power / (0.001 * 50))
+        return dBm
+    
+    def calc_fft(self, freq_range=(100, 1500), log=True):
+        
+        freq_min, freq_max = freq_range
+        self.freq, self.freq2plot = self._calc_fftfreq()
+        
+        # get the first usable spectrum into the result variable
+        fft_avgd = 2 * np.abs(self.buff_ffts[1 + self.offset][0:int(self.freq.size / 2)]) / self.num_of_avg
+        for i in range(2 + self.offset, self.num_of_avg + self.offset):
+            fft_avgd = fft_avgd + 2 * np.abs(self.buff_ffts[i][0:int(self.freq.size / 2)]) / self.num_of_avg
+        
+        fft_avgd_dBm = self._psd2dBm(fft_avgd) 
+        
+        # put it into a dataframe in order to easier select the frequency range
+        self.fft_df = pd.DataFrame({'Freq': self.freq2plot, 'FFT': fft_avgd_dBm})
+        # select frequency range
+        self.fft_df = self.fft_df[(self.fft_df['Freq'] >= freq_min) & (self.fft_df['Freq'] <= freq_max)]
+
+ 
+        return self.fft_df['FFT'], self.fft_df
+    
+    def plot_fft(self, freq_range=(1, 100e6), logx=False):
+        freq_min, freq_max = freq_range
+
+        fig, ax = plt.subplots(figsize=(4, 2))
+        self.fft_df.plot(x='Freq', y='FFT', ax=ax)
+        # ax.plot(self.freq2plot, np.sqrt(fft_avgd), label='Current Circuit')
+
+        ax.set_title('Power Density Spectrum (' + str(self.num_of_avg) + ' average)');
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel('Displacement (dBm)')
+        # ax.set_yscale('log')
+        if logx: ax.set_xscale('log')
+        ax.legend(loc='upper right', bbox_to_anchor=(1, 1), prop={'size': 8})
+    
+        return fig
         
 class FrameAcquisitionThread(threading.Thread):
     
