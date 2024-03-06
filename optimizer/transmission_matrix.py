@@ -2,6 +2,7 @@ from . import phase_conjugation
 from ..loader import patterns as pt
 from ..utils import upload as up
 from ..utils import download as down
+from ..utils.misc import get_params
 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from slmPy import slmpy
@@ -23,16 +24,18 @@ import warnings
 
 class measTM:
 
-    def __init__(self, 
-                 slm, camera, 
-                 pattern_loader, 
-                 slm_macropixel_size,
-                 slm_resolution=(800, 600),
-                 off=(0, 0),
-                 calib_px=112,
-                 remote=True, 
-                 corr_path=None,
-                 save_path=None):
+    # def __init__(self, 
+    #              slm, camera, 
+    #              pattern_loader, 
+    #              macropixel,
+    #              slm_resolution=(800, 600),
+    #              offset=(0, 0),
+    #              gray_calibration=112,
+    #              remote=True, 
+    #              corr_path=None,
+    #              save_path=None):
+    
+    def __init__(self, slm, camera, pattern_loader, **config)
         """
 
         Parameters
@@ -48,29 +51,91 @@ class measTM:
         save data path
         """
         
+        # hardware objects
+        self.slm = slm
+        self.camera = camera
+        
+        # pattern loader
+        self.pattern_loader = pattern_loader
+        
+        # general parameters
+        get_params(**config['method'])
+
+        # SLM settings
+        get_params(**config['hardware']['slm']['params'])
+
+        resX, resY = self.resolution
+        self.patternSLM = pt.PatternsBacic(resX, resY)
+                        
+        # define a filename
+        self.filepath = self._create_filepath()
+        
         # camera
         self.camera = camera
         
         # slm settings
-        self.slm = slm
         self.num_in = len(pattern_loader)
-        self.slm_macropixel_size = slm_macropixel_size
-        self.calib_px = calib_px
-        self.resX, self.resY = slm_resolution
-        self.off = off
-        self.remote = remote # is the slm connected to a raspberry Pi ?
-        
-        # load basis patterns
-        self.pattern_loader = pattern_loader
-        
+                        
         # correction pattern
-        self.corr_path = corr_path
+        # self.corr_path = corr_path
         
         # save raw data path
-        self.save_path = save_path
-        self.filepath = self._create_filepath()
+        # self.save_path = save_path
+        # self.filepath = self._create_filepath()
+ 
+    def get(self, slm_delay=0.1):
+        """ A simpler implemetantion of the TM acquisition where only a time delay is introduced between 
+            uploading and downloading in order to make sure that the pattern is uploaded before acquiring
+            a frame
+
+        Parameters
+        ----------
+        slm_delay : float, optional
+            time delay between uploading and downloading, by default 0.1
+
+        Returns
+        -------
+        frames : list
+            a list of interferogram frames            
+        """
+
+        pi = int(self.gray_calibration / 2)
+        four_phases = [0, pi / 2, pi, 3 * pi / 2]
+
+        self.frames = []
+
+        resX, resY = (800, 600)
+        slm_patterns = pt.PatternsBacic(resX, resY)
+
+
+        # loop through each 2d vector of the loaded basis
+        for vector in tqdm(self.pattern_loader, desc="Uploading pattern vectors", leave=True):
+            # and for each vector load the four reference phases
+            for phase in four_phases:
+                pattern = slm_patterns.pattern_to_SLM(vector, self.macropixel, phase, self.offset)
+                if self.remote:
+                    self.slm.sendArray(pattern)
+                else:
+                    self.slm.updateArray(pattern) # load each vector to slm
+                time.sleep(slm_delay) # wait to make sure the vector is loaded
+                
+                # get frame for each phase
+                frame = self.camera.get_pending_frame_or_null()
+                image_buffer_copy = np.copy(frame.image_buffer)
+                
+                # check saturation
+                max_level = np.amax(image_buffer_copy)
+                if max_level > 1000:
+                    warnings.warn("Pixel saturation: {}.".format(max_level), UserWarning)
+
+                self.frames.append(image_buffer_copy)
+                
+
+        print("ΤΜ acquisition completed ! ")
+            
+        return self.frames
         
-    def get(self):
+    def get_w_threads(self):
         """ Opens two parallel threads one to upload patterns to the SLM and one to download frames
             from the camera
         """
@@ -85,9 +150,9 @@ class measTM:
                                             download_frame_event,
                                             upload_pattern_event,
                                             stop_all_event,
-                                            calib_px = self.calib_px,
+                                            gray_calibration = self.gray_calibration,
                                             num_in=self.num_in,
-                                            slm_macropixel_size=self.slm_macropixel_size,
+                                            macropixel=self.macropixel,
                                             path=self.corr_path)
 
         download_thread = down.FrameAcquisitionThread(self.camera,
@@ -110,57 +175,7 @@ class measTM:
         
         return self.patterns, self.frames
     
-    def get2(self, slm_delay=0.1):
-        """ A simpler implemetantion of the TM acquisition where only a time delay is introduced between 
-            uploading and downloading in order to make sure that the pattern is uploaded before acquiring
-            a frame
 
-        Parameters
-        ----------
-        slm_delay : float, optional
-            time delay between uploading and downloading, by default 0.1
-
-        Returns
-        -------
-        frames : list
-            a list of interferogram frames            
-        """
-        
-        pi = int(self.calib_px / 2)
-        four_phases = [0, pi / 2, pi, 3 * pi / 2]
-        
-        self.frames = []
-        
-        resX, resY = (800, 600)
-        slm_patterns = pt.PatternsBacic(resX, resY)
-
-
-        # loop through each 2d vector of the loaded basis
-        for vector in tqdm(self.pattern_loader, desc="Uploading pattern vectors", leave=True):
-            # and for each vector load the four reference phases
-            for phase in four_phases:
-                pattern = slm_patterns.pattern_to_SLM(vector, self.slm_macropixel_size, phase, self.off)
-                if self.remote:
-                    self.slm.sendArray(pattern)
-                else:
-                    self.slm.updateArray(pattern) # load each vector to slm
-                time.sleep(slm_delay) # wait to make sure the vector is loaded
-                
-                # get frame for each phase
-                frame = self.camera.get_pending_frame_or_null()
-                image_buffer_copy = np.copy(frame.image_buffer)
-                
-                # check saturation
-                max_level = np.amax(image_buffer_copy)
-                if max_level > 1000:
-                    warnings.warn("Pixel saturation: {}.".format(max_level), UserWarning)
-
-                self.frames.append(image_buffer_copy)
-                
-
-        print("ΤΜ acquisition completed ! ")
-            
-        return self.frames
     
     def _create_filepath(self):
         """ creates a filepath to save data
@@ -179,7 +194,7 @@ class measTM:
         
         filename = '{}_tm_raw_data_num_in{}_slm_macro{}'.format(date_time_str,  
                                                                 self.num_in, 
-                                                                self.slm_macropixel_size)
+                                                                self.macropixel)
         
         if self.save_path:
             self.filepath = os.path.join(new_path, filename)
@@ -194,6 +209,7 @@ class measTM:
 
         with open(self.filepath + '.pkl', 'wb') as fp:
             pickle.dump((self.frames), fp)
+            
         
 class calcTM(measTM):
 
@@ -374,7 +390,7 @@ class calcTM(measTM):
         # target_frame = tgt.gauss(num=16, order=0, w0=1e-4, slm_calibration_px=112)
 
         # phase conjugation - create mask
-        msk = phase_conjugation.InverseLight(target_frame, self.tm, slm_macropixel=self.slm_macropixel, calib_px=112)
+        msk = phase_conjugation.InverseLight(target_frame, self.tm, slm_macropixel=self.slm_macropixel, gray_calibration=112)
         phase_mask = msk.inverse_prop(conj=True)
 
         # merge phase mask into an slm pattern

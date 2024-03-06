@@ -8,12 +8,6 @@ from ..utils.misc import create_filepath
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from aotools.functions import phaseFromZernikes, zernike_noll
-
-from metavision_core.event_io.raw_reader import initiate_device
-from metavision_core.event_io import EventsIterator
-from metavision_sdk_core import OnDemandFrameGenerationAlgorithm
-from metavision_sdk_ui import EventLoop
-from metavision_hal import I_ROI
 import time
 
 
@@ -23,12 +17,11 @@ class IterationAlgos():
         and Hadamard Partition (HPA) algorithms. 
     """
     
-    def __init__(self, slm, camera, pattern_loader, daq=None, **config):
+    def __init__(self, slm, input, pattern_loader, **config):
         
         # hardware objects
         self.slm = slm
-        self.camera = camera
-        self.daq = daq
+        self.input = input
         
         # pattern loader
         self.pattern_loader = pattern_loader
@@ -43,12 +36,10 @@ class IterationAlgos():
         resX, resY = self.resolution
         self.patternSLM = pt.PatternsBacic(resX, resY)
                 
-        # save raw data path
-        self.save_path = config.get('path', None)
         
         # define a filename
-        self.filepath = types.MethodType(create_filepath, self)
-        # self.filepath = self._create_filepath()
+        self.filepath = self._create_filepath()
+
      
     def _get_params(self, **config):
         for key, value in config.items():
@@ -197,18 +188,11 @@ class ContinuousSequential(IterationAlgos):
                         # upload pattern to slm
                         self.upload_pattern(temp)
 
-                        # get interferogram from camera
-                        # frame = self.get_frame()
-                        frame = self.camera.get()
-                        # get spectrum from daq
-                        if self.daq:
-                            raw = self.daq.acquire()
-                            # fft, _ = self.daq.calc_fft((3000, 5000))
+                        # get input measurement (camera frame/time series/spectrum)
+                        frame = self.input.get()
+                        # calculate cost here
+                        corr_k = self.callback(frame)
 
-                        # calculate correlation here
-                            corr_k = self.callback(raw)
-                        else:
-                            corr_k = self.callback(frame)
                         corr.append(corr_k)
 
                     counter += 1 

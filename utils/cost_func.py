@@ -1,6 +1,6 @@
 import numpy as np
 
-def corr_coef(X, Y):
+def correlation_coefficient(X, Y):
     """ takes two 2d arrays, flattens them calculates the 
         corresponding covariance matrix. the correlation coefficient
         is calculated by r = cov(x, y) / sqrt(var(x) * var(y))
@@ -18,7 +18,7 @@ def corr_coef(X, Y):
     return corr_coeff
 
 
-def snr(frame, mask_radius=8, mask_offset=(0, 0), intesity_only=False):
+def signal_to_noise_ratio(frame, mask_radius=8, mask_offset=(0, 0), intesity_only=False):
     """ Thank you S. Popoff
         Creates mask with a disk in the center and calculates the ratio of the
         pixel intensity in the disk to the pixel intensity outside the disk.
@@ -42,10 +42,10 @@ def snr(frame, mask_radius=8, mask_offset=(0, 0), intesity_only=False):
 
     return cost    
 
-def maximize_spectrum(spectrum):
+def max_of_spectrum(spectrum):
     """ Takes an FFT series and returns its maximum"""
     return np.max(spectrum)
 
-def peak_2_peak(time_series):
+def peak_to_peak(time_series):
     """ Take a times series and returns the peak to peak voltage"""
     return np.ptp(time_series)
