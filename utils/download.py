@@ -1,13 +1,14 @@
-from collections.abc import Callable, Iterable, Mapping
-from typing import Any
-from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 import threading
-import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import ctypes
+
+from picosdk.ps4000a import ps4000a as ps
+from picosdk.functions import assert_pico_ok
+from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
+
 from .redpitaya_scpi import scpi
-from slmPy import slmpy
 from .misc import get_params
 
 class PropheseeCamera():
@@ -15,6 +16,263 @@ class PropheseeCamera():
     def __init__(self) -> None:
         pass
 
+
+class PicoScope():
+    """ A class using the picosdk to fetch timeseries data from picoscope. Heavily inspired
+        by Loic Rondin's implementation. Merci Loic !
+    """
+    
+    def __init__(self, **config):
+            # Create chandle and status ready for use
+            self.chandle = ctypes.c_int16()
+            self.status = {}
+            # self.params = {}#TODO
+            self.active_ch = []
+
+            self.config = config
+            self.params = self.config_constructor()
+            
+    def config_constructor(self):
+        # get params
+        channel = self.config['channel']
+        coupling = self.config['coupling']
+        voltage_range = self.config['range']
+        offset = self.config['offset']
+        trigger = self.config['trigger']
+        
+        # create here new dict that the picoscope can understand
+        params = {}
+
+        # create all channels
+        params['ch'] = []
+        for i in range(8):
+            params['ch'].append([0,1,1,0])
+
+        # activate user-defined channel
+        params['ch'][channel]=[1, coupling, voltage_range, offset] # chan A
+
+        # set trigger
+        params['trigger']= [trigger, 0, 1024, 2, 0, 1000]
+
+        return params
+    
+    def start(self):
+        """Initialize the pico scope"""
+        # Open PicoScope 4000 Series device
+        # Returns handle to chandle for use in future API functions
+        self.status["openunit"] = ps.ps4000aOpenUnit(ctypes.byref(self.chandle), None)
+        try:
+            assert_pico_ok(self.status["openunit"])
+        except:	
+
+            powerStatus = self.status["openunit"]	
+
+            if powerStatus == 286:
+                self.status["changePowerSource"] = ps.ps4000aChangePowerSource(self.chandle, powerStatus)
+            else:
+                raise	
+
+            assert_pico_ok(self.status["changePowerSource"])
+        return self.status
+    
+    def set_aq_config(self):
+        """
+        Configure the aquisition of the picoscope (channel and trigger)
+
+        Parameters
+        ----------
+        params : dictionary hosting the config
+           params['ch'][i_channel] = [enabled,coupling,range,analogOffset]
+           params['trigger'] = [enabled , source,threshold, direction, delay, auto Trigger time (ms)] 
+
+           - enabled = 0 (disabled) or 1
+           - coupling = 0 (AC) or 1 (DC)
+           - range = 0 (±10 mV), 1 (±20 mV), 2 (±50), 3 (±100), 4 (±200), 5 (±500), 6 (±1 V), 7 (± 2V)
+           - analogOffset in V
+
+        TODO? gestion param correctC
+        """
+        # Set up channel 
+        # handle = chandle
+        # channel = PS4000a_CHANNEL_A = 0
+        # enabled = 1
+        # coupling type = PS4000a_DC = 1
+        # range = PS4000a_2V = 7,verticalContainer
+        # analogOffset = 0 V
+        # self.params = params
+        pch = self.params['ch']
+        for i in range(8):
+            if(pch[i][0]==1):
+                self.active_ch.append(i)
+            self.status["setCh"] = ps.ps4000aSetChannel(self.chandle, i, pch[i][0], pch[i][1], pch[i][2], pch[i][3])
+            assert_pico_ok(self.status["setCh"])
+        self.Nch = np.size(self.active_ch)
+
+        # Set up single trigger
+        # handle = chandle
+        # enabled = 1
+        # source = PS4000a_CHANNEL_A = 0
+        # threshold = 1024 ADC counts
+        # direction = PS4000a_RISING = 2
+        # delay = 0 s
+        # auto Trigger = 1000 ms
+        ptrig = self.params['trigger']
+        self.status["trigger"] = ps.ps4000aSetSimpleTrigger(self.chandle, ptrig[0], ptrig[1], 
+                                                       ptrig[2], ptrig[3], ptrig[4], ptrig[5])
+        assert_pico_ok(self.status["trigger"])
+        
+        #set up acquisition
+        #pSR= param['setSR']
+        #self.sampleInterval = ctypes.c_int32(pSR['SR'])
+        #self.sampleUnits = ps.PS4000A_TIME_UNITS['PS4000A_US'] #TODO
+        
+    def get_aq_config(self):
+        """return the config file that is in use"""
+        return self.params
+    
+    def get(self, sample_number=100000, number_capture=1, sampling_rate=1e6):
+        """
+        Record a set of data using the block acqusition mode from the picoscope
+        Parameters
+        ----------
+        sample_number: int
+            number of sample to collect (default= 100000)
+        number_capture: int
+            TODO (default=1)
+        sampling_rate: float
+            sampling rate in Hz. (default =1)
+            Minimal timebase is 12.5 ns, thus if the sampling is not a multiple of 12.5 ns,
+            the closest value below the requested sampling rate will be used 
+
+         Returns
+        -------
+        buffers: array
+            A 2d arrays with the data for each channel 
+        """
+        # Get timebase information
+        # WARNING: When using this example it may not be possible to access all Timebases as all channels are enabled by default when opening the scope.  
+        # To access these Timebases, set any unused analogue channels to off.
+        # handle = chandle
+        # timebase = 8 => 8x(12,5 ns) or sampling rate 80 MHz/(8+1)
+        # noSamples = maxSamples
+        # pointer to timeIntervalNanoseconds = ctypes.byref(timeIntervalns)
+        # pointer to maxSamples = ctypes.byref(returnedMaxSamples)
+        # segment index = 0
+        
+        self.timebase = int(80e6 / sampling_rate - 1 ) # 1 MS/s
+        timeIntervalns = ctypes.c_float()
+        returnedMaxSamples = ctypes.c_int32()
+        oversample = ctypes.c_int16(1)
+        self.status["getTimebase2"] = ps.ps4000aGetTimebase2(
+            self.chandle, 
+            self.timebase, 
+            sample_number,
+            ctypes.byref(timeIntervalns), 
+            ctypes.byref(returnedMaxSamples), 
+            0
+            )
+        
+        assert_pico_ok(self.status["getTimebase2"])
+        
+        nMaxSamples = ctypes.c_int32(0)
+        
+        self.status["setMemorySegments"] = ps.ps4000aMemorySegments(
+            self.chandle, 
+            10, 
+            ctypes.byref(nMaxSamples))
+        
+        assert_pico_ok(self.status["setMemorySegments"])
+        
+        # Set number of captures
+        # handle = chandle
+        # nCaptures = 
+        self.status["SetNoOfCaptures"] = ps.ps4000aSetNoOfCaptures(self.chandle, number_capture)
+        
+        assert_pico_ok(self.status["SetNoOfCaptures"])
+        
+        # set up buffers
+        memory_segment=0
+        buffers = np.zeros(shape=(self.Nch,sample_number), dtype=np.int16)
+        for i in range(self.Nch):
+            ch = self.active_ch[i]
+            self.status["setDataBuffersB"] = ps.ps4000aSetDataBuffers(
+                self.chandle, 
+                ch,
+                buffers[i].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)),
+                None, 
+                sample_number,memory_segment,
+                0
+                )
+            
+            assert_pico_ok(self.status["setDataBuffersB"])
+        
+        # run block capture
+        # handle = chandle
+        # number of pre-trigger samples = preTriggerSamples
+        # number of post-trigger samples = PostTriggerSamples
+        # timebase = 3 = 80 ns = timebase (see Programmer's guide for mre information on timebases)
+        # time indisposed ms = None (not needed in the example)
+        # segment index = 0
+        # lpReady = None (using ps4000aIsReady rather than ps4000aBlockReady)
+        # pParameter = None
+        
+        self.status["runBlock"] = ps.ps4000aRunBlock(
+            self.chandle, 
+            0, 
+            sample_number, 
+            self.timebase, 
+            None, 
+            0, 
+            None, 
+            None)
+        
+        assert_pico_ok(self.status["runBlock"])
+        # check for end of capture
+        ready = ctypes.c_int16(0)
+        check = ctypes.c_int16(0)
+        while ready.value == check.value:
+            self.status["isReady"] = ps.ps4000aIsReady(self.chandle, ctypes.byref(ready))
+        
+        # Creates a overlow location for data
+        overflow = (ctypes.c_int16 * number_capture)()
+        # Creates converted types maxsamples
+        cmaxSamples = ctypes.c_int32(sample_number)
+        
+        # collect data 
+        # handle = chandle
+        # noOfSamples = cmaxSamples
+        # fromSegmentIndex = 0
+        # toSegmentIndex = 9
+        # downSampleRatio = 1
+        # downSampleRatioMode = PS4000A_RATIO_MODE_NONE
+        self.status["getValuesBulk"] = ps.ps4000aGetValuesBulk(
+            self.chandle, 
+            ctypes.byref(cmaxSamples), 
+            0, 
+            number_capture-1, 
+            1, 
+            0, 
+            ctypes.byref(overflow)
+            )
+        
+        assert_pico_ok(self.status["getValuesBulk"])
+        return buffers
+
+    def stop(self):
+        """Stop and close the picoscope"""
+        # Stop the scope
+        # handle = chandle
+        self.status["stop"] = ps.ps4000aStop(self.chandle)
+        assert_pico_ok(self.status["stop"])	
+
+        # Disconnect the scope
+        # handle = chandle
+        self.status["close"] = ps.ps4000aCloseUnit(self.chandle)
+        assert_pico_ok(self.status["close"])	
+
+        # Display self.status returns
+        return self.status
+    
 class ZeluxCamera():
     
     def __init__(self, **config):
@@ -103,8 +361,9 @@ class RedPitaya:
         
         # make sure the decimation was set
         self.rp.tx_txt('ACQ:DEC?')
+        self.decimation = self.rp.rx_txt()
         # display('Decimation set to: ' + str(self.rp.rx_txt()))
-        print('Red Pitaya daq loaded - decimation set to: ' + str(self.rp.rx_txt()))
+        # print('Red Pitaya daq loaded - decimation set to: ' + str(self.rp.rx_txt()))
 
         # prepare buffer dataframes
         self.buff_ffts = pd.DataFrame()

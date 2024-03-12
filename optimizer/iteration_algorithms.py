@@ -39,7 +39,6 @@ class IterationAlgos():
         
         # define a filename
         self.filepath = self._create_filepath()
-
      
     def _get_params(self, **config):
         for key, value in config.items():
@@ -167,10 +166,11 @@ class ContinuousSequential(IterationAlgos):
     def run(self):
         
         gray = 0
+        counter = 0
+
         self.final_pattern = np.array([[gray for _ in range(self.N)] for _ in range(self.N)]).astype('uint8')
         
         self.cost = []
-        counter = 0
         self.frames = {}
 
         for iteration in range(1, self.total_iterations+1):   
@@ -189,11 +189,16 @@ class ContinuousSequential(IterationAlgos):
                         self.upload_pattern(temp)
 
                         # get input measurement (camera frame/time series/spectrum)
+                        # okay, this a temporary thing to check if the redpi will not bug
+                        # if i make a new daw device at each iteration ...
                         frame = self.input.get()
+                        time.sleep(0.2)
+
                         # calculate cost here
-                        corr_k = self.callback(frame)
+                        corr_k = self.callback(frame[0])
 
                         corr.append(corr_k)
+                        print(corr)
 
                     counter += 1 
                     print(counter, np.max(corr))

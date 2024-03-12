@@ -1,4 +1,4 @@
-from ..utils.download import ZeluxCamera, RedPitaya, PropheseeCamera
+from ..utils.download import ZeluxCamera, RedPitaya, PropheseeCamera, PicoScope
 from ..utils.upload import SpatialLightModulator
 
 
@@ -70,12 +70,13 @@ class InitExperiment():
             'ccd':  ZeluxCamera,
             'event-based': PropheseeCamera,
             'redpi': RedPitaya,
+            'pico': PicoScope,
         }
         
         if hardware_type not in HARDWARE_TYPE_TO_CLASS_MAP:
             raise ValueError('Bad hardware type {}'.format(hardware_type))
         
-        print('{} parameters are:'.format(hardware_type))
-        print(params)
+        # print('{} parameters are:'.format(hardware_type))
+        # print(params)
     
         return HARDWARE_TYPE_TO_CLASS_MAP[hardware_type](**params)
