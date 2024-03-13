@@ -8,11 +8,64 @@ import numpy as np
 import pandas as pd
 from .redpitaya_scpi import scpi
 from slmPy import slmpy
+from metavision_core.event_io.raw_reader import initiate_device, RawReader
+from metavision_sdk_core import OnDemandFrameGenerationAlgorithm
+from metavision_hal import I_ROI
+import time
 
 class PropheseeCamera():
     
-    def __init__(self) -> None:
-        pass
+    def __init__(self, **kwargs):
+        print("Prophesee camera initialized - use init_cam() to arm the camera and get() to get frames")
+        # camera settings
+        self.roi_size = kwargs.get('roi_size', 0)
+        self.roi_off = kwargs.get('roi_off', (0, 0))
+        self.accumulation_time = kwargs.get('accumulation_time', 1000)
+
+    def init_cam(self):
+        """ Initializes and sets camera parameters
+        """
+        # camera instance
+        self.camera = initiate_device("")
+        self.init_time = time.time() # ref time to know the time stamp of current events which are generated with respect to the time we initiate the camera
+        self.height = self.camera.get_i_geometry().get_height() # camera height
+        self.width = self.camera.get_i_geometry().get_width() # camera width
+
+        # configure
+        self.cam_stream = RawReader.from_device(device=self.camera)
+        self.frameGen = OnDemandFrameGenerationAlgorithm(width = self.width, height = self.height)
+        self.frameGen.set_accumulation_time_us(self.accumulation_time)
+        if self.roi_size != 0:
+            self.roi_size_off_x, self.roi_size_off_y = self.roi_off
+            self.camera.get_i_roi().set_window(self.camera.get_i_roi().window(self.roi_size_off_x, self.roi_size_off_y, self.roi_size, self.roi_size)) 
+            self.camera.get_i_roi().enable(True)
+        
+        return self.camera
+    
+    def close_cam(self):
+        del self.camera
+
+    def get(self):
+        """ Get frame from Prophesee camera
+        """
+        if not self.cam_stream.is_done():
+            # check that enough time has past since last generation
+            if self.cam_stream.current_time + self.accumulation_time > (time.time()-self.init_time)*1e6:
+                time.sleep(self.accumulation_time*1e-6)
+            
+            # move the cursor to the current time 
+            self.cam_stream.seek_time((time.time()-self.init_time)*1e6-self.accumulation_time)
+            
+            # load and process the events of the last accumulation_time period
+            events = self.cam_stream.load_delta_t(self.accumulation_time)
+            while events.size == 0:
+                events = self.cam_stream.load_delta_t(self.accumulation_time)
+            self.frameGen.process_events(events)
+            frame = np.zeros((self.height, self.width, 3), np.uint8)
+            self.frameGen.generate(events['t'][-1], frame)
+            img = np.mean(frame, axis = 2)
+        
+        return img
 
 class ZeluxCamera():
     
