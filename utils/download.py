@@ -18,7 +18,8 @@ class PropheseeCamera():
     def __init__(self, **kwargs):
         print("Prophesee camera initialized - use init_cam() to arm the camera and get() to get frames")
         # camera settings
-        self.roi_size = kwargs.get('roi_size', 0)
+        self.roi_size_x = kwargs.get('roi_size_x', 0)
+        self.roi_size_y = kwargs.get('roi_size_y', 0)
         self.roi_off = kwargs.get('roi_off', (0, 0))
         self.accumulation_time = kwargs.get('accumulation_time', 1000)
 
@@ -35,9 +36,9 @@ class PropheseeCamera():
         self.cam_stream = RawReader.from_device(device=self.camera)
         self.frameGen = OnDemandFrameGenerationAlgorithm(width = self.width, height = self.height)
         self.frameGen.set_accumulation_time_us(self.accumulation_time)
-        if self.roi_size != 0:
+        if self.roi_size_x != 0:
             self.roi_size_off_x, self.roi_size_off_y = self.roi_off
-            self.camera.get_i_roi().set_window(self.camera.get_i_roi().window(self.roi_size_off_x, self.roi_size_off_y, self.roi_size, self.roi_size)) 
+            self.camera.get_i_roi().set_window(self.camera.get_i_roi().Window(self.roi_size_off_x, self.roi_size_off_y, self.roi_size, self.roi_size)) 
             self.camera.get_i_roi().enable(True)
         
         return self.camera
@@ -58,8 +59,8 @@ class PropheseeCamera():
             
             # load and process the events of the last accumulation_time period
             events = self.cam_stream.load_delta_t(self.accumulation_time)
-            while events.size == 0:
-                events = self.cam_stream.load_delta_t(self.accumulation_time)
+            # while events.size == 0:
+            #    events = self.cam_stream.load_delta_t(self.accumulation_time)
             self.frameGen.process_events(events)
             frame = np.zeros((self.height, self.width, 3), np.uint8)
             self.frameGen.generate(events['t'][-1], frame)
