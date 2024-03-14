@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from .redpitaya_scpi import scpi
 from slmPy import slmpy
+import sys 
+sys.path.append("/usr/lib/python3/dist-packages/")
 from metavision_core.event_io.raw_reader import initiate_device, RawReader
 from metavision_sdk_core import OnDemandFrameGenerationAlgorithm
 from metavision_hal import I_ROI
