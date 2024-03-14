@@ -39,6 +39,7 @@ class PicoScope():
         voltage_range = self.config['range']
         offset = self.config['offset']
         trigger = self.config['trigger']
+        num_of_samples = self.config['num_of_samples']
         
         # create here new dict that the picoscope can understand
         params = {}
@@ -49,11 +50,14 @@ class PicoScope():
             params['ch'].append([0,1,1,0])
 
         # activate user-defined channel
-        params['ch'][channel]=[1, coupling, voltage_range, offset] # chan A
+        params['ch'][channel] = [1, coupling, voltage_range, offset] # chan A
 
         # set trigger
-        params['trigger']= [trigger, 0, 1024, 2, 0, 1000]
+        params['trigger'] = [trigger, 0, 1024, 2, 0, 1000]
 
+        # num of samples
+        params['num_of_samples'] = num_of_samples
+        
         return params
     
     def start(self):
@@ -75,7 +79,7 @@ class PicoScope():
             assert_pico_ok(self.status["changePowerSource"])
         return self.status
     
-    def set_aq_config(self):
+    def set_config(self):
         """
         Configure the aquisition of the picoscope (channel and trigger)
 
@@ -126,11 +130,11 @@ class PicoScope():
         #self.sampleInterval = ctypes.c_int32(pSR['SR'])
         #self.sampleUnits = ps.PS4000A_TIME_UNITS['PS4000A_US'] #TODO
         
-    def get_aq_config(self):
+    def get_config(self):
         """return the config file that is in use"""
         return self.params
     
-    def get(self, sample_number=100000, number_capture=1, sampling_rate=1e6):
+    def get(self, number_capture=1, sampling_rate=1e6):
         """
         Record a set of data using the block acqusition mode from the picoscope
         Parameters
@@ -159,6 +163,7 @@ class PicoScope():
         # pointer to maxSamples = ctypes.byref(returnedMaxSamples)
         # segment index = 0
         
+        sample_number = self.params['num_of_samples']
         self.timebase = int(80e6 / sampling_rate - 1 ) # 1 MS/s
         timeIntervalns = ctypes.c_float()
         returnedMaxSamples = ctypes.c_int32()
@@ -200,7 +205,8 @@ class PicoScope():
                 ch,
                 buffers[i].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)),
                 None, 
-                sample_number,memory_segment,
+                sample_number,
+                memory_segment,
                 0
                 )
             

@@ -35,7 +35,7 @@ class measTM:
     #              corr_path=None,
     #              save_path=None):
     
-    def __init__(self, slm, camera, pattern_loader, **config)
+    def __init__(self, slm, camera, pattern_loader, **config):
         """
 
         Parameters
@@ -59,16 +59,13 @@ class measTM:
         self.pattern_loader = pattern_loader
         
         # general parameters
-        get_params(**config['method'])
+        self._get_params(**config['method'])
 
         # SLM settings
-        get_params(**config['hardware']['slm']['params'])
+        self._get_params(**config['hardware']['slm']['params'])
 
         resX, resY = self.resolution
         self.patternSLM = pt.PatternsBacic(resX, resY)
-                        
-        # define a filename
-        self.filepath = self._create_filepath()
         
         # camera
         self.camera = camera
@@ -76,13 +73,21 @@ class measTM:
         # slm settings
         self.num_in = len(pattern_loader)
                         
+        # define a filename
+        self.filepath = self._create_filepath()
+        
         # correction pattern
         # self.corr_path = corr_path
         
         # save raw data path
         # self.save_path = save_path
         # self.filepath = self._create_filepath()
- 
+        
+    def _get_params(self, **config):
+        for key, value in config.items():
+            setattr(self, key, value) # sets the instanitated class as an attrinute of this class
+
+            
     def get(self, slm_delay=0.1):
         """ A simpler implemetantion of the TM acquisition where only a time delay is introduced between 
             uploading and downloading in order to make sure that the pattern is uploaded before acquiring
@@ -120,15 +125,16 @@ class measTM:
                 time.sleep(slm_delay) # wait to make sure the vector is loaded
                 
                 # get frame for each phase
-                frame = self.camera.get_pending_frame_or_null()
-                image_buffer_copy = np.copy(frame.image_buffer)
+                frame =self.camera.get()
+                # frame = self.camera.get_pending_frame_or_null()
+                # image_buffer_copy = np.copy(frame.image_buffer)
                 
                 # check saturation
-                max_level = np.amax(image_buffer_copy)
+                max_level = np.amax(frame)
                 if max_level > 1000:
                     warnings.warn("Pixel saturation: {}.".format(max_level), UserWarning)
 
-                self.frames.append(image_buffer_copy)
+                self.frames.append(frame)
                 
 
         print("ΤΜ acquisition completed ! ")

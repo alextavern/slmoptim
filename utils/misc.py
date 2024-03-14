@@ -26,8 +26,8 @@ def pattern_frame(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600
         slm.updateArray(pattern)
     
     time.sleep(0.5)
-    frame = camera.get_pending_frame_or_null()
-    frame = np.copy(frame.image_buffer)
+    frame = camera.get()
+    # frame = np.copy(frame.image_buffer)
     
     if norm:
         frame = cam.normalize_frame(frame)

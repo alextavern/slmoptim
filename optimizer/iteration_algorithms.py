@@ -43,8 +43,6 @@ class IterationAlgos():
     def _get_params(self, **config):
         for key, value in config.items():
             setattr(self, key, value) # sets the instanitated class as an attrinute of this class
-
-            
  
     def register_callback(self, callback):
         """ This callback function is used to pass a custom cost function
@@ -189,19 +187,15 @@ class ContinuousSequential(IterationAlgos):
                         self.upload_pattern(temp)
 
                         # get input measurement (camera frame/time series/spectrum)
-                        # okay, this a temporary thing to check if the redpi will not bug
-                        # if i make a new daw device at each iteration ...
+
                         frame = self.input.get()
-                        time.sleep(0.2)
+                        time.sleep(0.2) # to make sure that data will be sent
 
                         # calculate cost here
-                        corr_k = self.callback(frame[0])
-
+                        corr_k = self.callback(frame[0]) # careful at the zero index, it is only for the picoscope!
                         corr.append(corr_k)
-                        print(corr)
 
                     counter += 1 
-                    print(counter, np.max(corr))
                     self.frames[counter] = frame
 
                     # update pattern with max corr
