@@ -17,11 +17,10 @@ class IterationAlgos():
         and Hadamard Partition (HPA) algorithms. 
     """
     
-    def __init__(self, slm, input, pattern_loader, **config):
-        
+    def __init__(self, slm, camera, pattern_loader, **config):
         # hardware objects
         self.slm = slm
-        self.input = input
+        self.camera = camera 
         
         # pattern loader
         self.pattern_loader = pattern_loader
@@ -36,7 +35,6 @@ class IterationAlgos():
         resX, resY = self.resolution
         self.patternSLM = pt.PatternsBacic(resX, resY)
                 
-        
         # define a filename
         self.filepath = self._create_filepath()
      
@@ -102,10 +100,11 @@ class IterationAlgos():
             os.makedirs(new_path)
         
         # define a filename
-        filename = '{}_optim_raw_data_{}_slm_segs{}_slm_macro{}.'.format(timestr,
-                                                                            self.type,
-                                                                            self.N ** 2, 
-                                                                            self.macropixel)
+        filename = '{}_{}'.format(
+            timestr,
+            self.type,
+            )
+        
         if self.save_path:
             self.filepath = os.path.join(new_path, filename)
         else:
@@ -116,7 +115,7 @@ class IterationAlgos():
     def save_raw(self):      
 
         with open(self.filepath + 'pkl', 'wb') as fp:
-            pickle.dump((self.frames, self.cost, self.final_pattern), fp)
+            pickle.dump(self.data_out, fp)
             
     def plot(self, frame, idx):
         
@@ -188,7 +187,7 @@ class ContinuousSequential(IterationAlgos):
 
                         # get input measurement (camera frame/time series/spectrum)
 
-                        frame = self.input.get()
+                        frame = self.camera.get()
                         time.sleep(0.2) # to make sure that data will be sent
 
                         # calculate cost here
@@ -257,7 +256,6 @@ class StepwiseSequential(IterationAlgos):
     
 class RandomPartition(IterationAlgos):
     
-        
     def run(self):
         
         gray = 0
@@ -314,59 +312,17 @@ class HadamardPartition(IterationAlgos):
     
     def run():
         pass
+    
 
-""" This class is implementing an idea found here https://www.wavefrontshaping.net/post/id/23
-    that uses Zenike Polynomials to optimize optical aberrations on a focused laser bea,
+""" This class implements an idea found here https://www.wavefrontshaping.net/post/id/23
+    that uses Zenike Polynomials to optimize optical aberrations on a focused laser beam
 """
 class CoefficientsOptimization(IterationAlgos):
-   
-    #    def __init__(self, 
-    #              slm, 
-    #              camera,
-    #              pattern_loader,
-    #              total_iterations=1,
-    #              slm_resolution=(800, 600),
-    #              slm_segments=256,
-    #              slm_macropixel=5, 
-    #              slm_calibration_pixel=112,
-    #              phase_steps=8,
-    #              type="cont",
-    #              remote=True,
-    #              save_path=None):
-            
-    def __init__(self, 
-                slm, 
-                camera,
-                slm_resolution=(600, 800),
-                slm_calibration_pixel=112,
-                num_of_coeffs=4,
-                radius=300, 
-                center=[600 // 2, 800 // 2],
-                remote=True,
-                save_path=None): 
-        
-        self.slm = slm
-        self.camera = camera
-        
-        # SLM
-        resX, resY = slm_resolution
-        self.patternSLM = pt.PatternsBacic(resX, resY)
-        self.gray_calibration = slm_calibration_pixel
-        self.shape = slm_resolution
-        
-        # Zernike
-        self.num_of_coeffs = num_of_coeffs
-        self.radius = radius
-        self.center = center
-        
-        # is the slm remotely connected to a rasp pi ?
-        self.remote = remote
-        
-        # save raw data path
-        # self.type
-        # self.save_path = save_path
-        # self.filepath = self._create_filepath()
-    
+              
+    def __init__(self, slm, camera, **config):
+        super().__init__(slm, camera, pattern_loader=None, **config)
+
+
     def register_cost_callback(self, callback):
         """ This callback function is used to pass a custom cost function
             to the optimization object
@@ -383,24 +339,6 @@ class CoefficientsOptimization(IterationAlgos):
         
     def register_download_callback(self, callback):
         self.download_callback = callback
-        
-    def upload_pattern(self, pattern, slm_delay=0.1):
-        """ Uploads a pattern to the SLM either in remote or local mode. Adds a user-defined
-            time delay to make sure that the pattern is uploaded. 
-        """
-        if self.remote:
-            self.slm.sendArray(pattern)
-        else:
-            self.slm.updateArray(pattern)
-        time.sleep(slm_delay)
-        
-    
-    def _get_frame(self):
-        """ Get frame from zelux thorlabs camera
-        """
-        frame = self.camera.get_pending_frame_or_null()
-        image_buffer = np.copy(frame.image_buffer)
-        return image_buffer
     
     def _get_disk_mask(self, center = None):
         '''
@@ -435,7 +373,7 @@ class CoefficientsOptimization(IterationAlgos):
         amp_mask = self._get_disk_mask()
         
         # put the Zernike mask at the right position and multiply by the disk mask
-        mask = np.zeros(shape = self.shape, dtype='complex')
+        mask = np.zeros(shape = self.resolution, dtype='complex')
         mask[self.center[0] - self.radius:self.center[0] + self.radius,
              self.center[1] - self.radius:self.center[1] + self.radius] = coeff_mask * amp_mask
         
@@ -453,7 +391,6 @@ class CoefficientsOptimization(IterationAlgos):
         
         return arg2SLM.astype('uint8')
         
-    
     def run(self, coeff_range=(-2, 2, 0.5)):
         
         counter = 0
@@ -477,7 +414,7 @@ class CoefficientsOptimization(IterationAlgos):
                 self.upload_pattern(zmask, 0.1)
                 
                 # get interferogram from camera
-                frame = self._get_frame()
+                frame = self.camera.get()
 
                 # calculate cost function and save it
                 cost_k = self.cost_callback(frame)
@@ -493,7 +430,8 @@ class CoefficientsOptimization(IterationAlgos):
             zmask = self._complex_mask_from_coeff(coeffs)
             zmask = self._phase2SLM(zmask)
             self.upload_pattern(zmask, 0.1)
-            frame = self._get_frame()
+            # frame = self._get_frame()
+            frame = self.camera.get()
             frames[counter] = frame
             masks[counter] = zmask
             
@@ -504,7 +442,6 @@ class CoefficientsOptimization(IterationAlgos):
             iterator.refresh()
             
             # save all into a big dict
-
             self.data_out["coeffs"] = coeffs
             self.data_out["cost"] = cost
             self.data_out["frames"] = frames

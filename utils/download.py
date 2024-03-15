@@ -1,5 +1,5 @@
-import threading
 import matplotlib.pyplot as plt
+import threading
 import numpy as np
 import pandas as pd
 import ctypes
