@@ -12,7 +12,7 @@ import sys
 sys.path.append("/usr/lib/python3/dist-packages/")
 from metavision_core.event_io.raw_reader import initiate_device, RawReader
 from metavision_sdk_core import OnDemandFrameGenerationAlgorithm
-from metavision_hal import I_ROI
+from metavision_hal import I_ROI, I_LL_Biases
 import time
 
 class PropheseeCamera():
@@ -147,7 +147,7 @@ class ZeluxCamera():
         image_buffer = np.copy(frame.image_buffer)
         
         return image_buffer
-    
+
 
 class RedPitaya:
 

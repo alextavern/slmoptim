@@ -25,7 +25,8 @@ The package structure is organized as follows:
 - optimizer - optimization methods
 - utils - support libraries
 
-This figure illustrates the package structure (subpackages/modules/classes)
+This figure illustrates the package structure (subpackages/modules/classes).
+You can be found some docuentation about those packages in the file [how_to.md](docs/how_to.md).
 ![pystruct](docs/python-package-structure.png)
 
 ### General flowchart
