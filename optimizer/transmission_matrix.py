@@ -23,17 +23,6 @@ import warnings
 
 
 class measTM:
-
-    # def __init__(self, 
-    #              slm, camera, 
-    #              pattern_loader, 
-    #              macropixel,
-    #              slm_resolution=(800, 600),
-    #              offset=(0, 0),
-    #              gray_calibration=112,
-    #              remote=True, 
-    #              corr_path=None,
-    #              save_path=None):
     
     def __init__(self, slm, camera, pattern_loader, **config):
         """

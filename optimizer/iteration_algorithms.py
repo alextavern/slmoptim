@@ -337,9 +337,7 @@ class CoefficientsOptimization(IterationAlgos):
     def register_pattern_callback(self, callback):
         self.pattern_callback = callback
         
-    def register_download_callback(self, callback):
-        self.download_callback = callback
-    
+
     def _get_disk_mask(self, center = None):
         '''
         Taken from S. Popoff blog
@@ -390,6 +388,12 @@ class CoefficientsOptimization(IterationAlgos):
         arg2SLM = arg2pi * self.gray_calibration / (2 * np.pi) 
         
         return arg2SLM.astype('uint8')
+    
+    def create_upload_pattern(self, coeffs):
+        zmask = self._complex_mask_from_coeff(coeffs)
+        zmask = self._phase2SLM(zmask)
+        self.upload_pattern(zmask, 0.1)
+        return zmask
         
     def run(self, coeff_range=(-2, 2, 0.5)):
         
@@ -401,7 +405,7 @@ class CoefficientsOptimization(IterationAlgos):
         
         # initialize the coefficients to optimize
         coeffs = np.zeros(self.num_of_coeffs)
-        # 
+        # get coeff sweep range 
         coeff_idx = np.arange(coeff_range[0], coeff_range[1], coeff_range[2])
         
         iterator = trange(self.num_of_coeffs)
@@ -409,9 +413,7 @@ class CoefficientsOptimization(IterationAlgos):
             cost_temp = []
             for coeff in coeff_idx:
                 coeffs[idx] = coeff
-                zmask = self._complex_mask_from_coeff(coeffs)
-                zmask = self._phase2SLM(zmask)
-                self.upload_pattern(zmask, 0.1)
+                zmask = self.create_upload_pattern(coeffs)
                 
                 # get interferogram from camera
                 frame = self.camera.get()
@@ -419,6 +421,8 @@ class CoefficientsOptimization(IterationAlgos):
                 # calculate cost function and save it
                 cost_k = self.cost_callback(frame)
                 cost_temp.append(cost_k)
+            
+            counter += 1 
 
             # update pattern with max corr
             cost.append(np.max(cost_temp))            
@@ -426,12 +430,10 @@ class CoefficientsOptimization(IterationAlgos):
             
             # just reload the optimal mask for this iteration and save 
             # the corresponding frame
-            counter += 1 
-            zmask = self._complex_mask_from_coeff(coeffs)
-            zmask = self._phase2SLM(zmask)
-            self.upload_pattern(zmask, 0.1)
-            # frame = self._get_frame()
+            
+            zmask = self.create_upload_pattern(coeffs)
             frame = self.camera.get()
+            
             frames[counter] = frame
             masks[counter] = zmask
             
