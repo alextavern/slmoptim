@@ -1,6 +1,6 @@
 # How to use the project
 
-In this document, one can find all the needed documentation about the different classes, functions and modules of this project, along with simple use case examples. The architecture of the project is detailed in the [README.md](./README.md) file. Here we give some documentation about the content of each module. 
+In this document, one can find all the needed documentation about the different classes, functions and modules of this project, along with simple use case examples. The architecture of the project is detailed in the [README.md](../README.md) file. Here we give some documentation about the content of each module. 
 
 ## Initializer
 
