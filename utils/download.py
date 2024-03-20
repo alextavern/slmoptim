@@ -47,17 +47,21 @@ class PropheseeCamera():
     
     def close_cam(self):
         del self.camera
+    
+    def set_accumulation_time(self, accumulation_time):
+        self.accumulation_time = accumulation_time
+        self.frameGen.set_accumulation_time_us(accumulation_time)
 
     def get(self):
         """ Get frame from Prophesee camera
         """
         if not self.cam_stream.is_done():
             # check that enough time has past since last generation
-            if self.cam_stream.current_time + self.accumulation_time > (time.time()-self.init_time)*1e6:
-                time.sleep(self.accumulation_time*1e-6)
+            if self.cam_stream.current_time + self.accumulation_time > (time.time() - self.init_time)*1e6:
+                time.sleep(self.accumulation_time * 1e-6)
             
             # move the cursor to the current time 
-            self.cam_stream.seek_time((time.time()-self.init_time)*1e6-self.accumulation_time)
+            self.cam_stream.seek_time((time.time() - self.init_time) * 1e6 - self.accumulation_time)
             
             # load and process the events of the last accumulation_time period
             events = self.cam_stream.load_delta_t(self.accumulation_time)
