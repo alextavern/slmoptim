@@ -20,6 +20,8 @@ class PropheseeCamera():
 class PicoScope():
     """ A class using the picosdk to fetch timeseries data from picoscope. Heavily inspired
         by Loic Rondin's implementation. Merci Loic !
+        
+        https://github.com/picotech/picosdk-python-wrappers/blob/master/ps4000aExamples/ps4000aRapidBlockExample.py
     """
     
     def __init__(self, **config):
@@ -46,7 +48,7 @@ class PicoScope():
 
         # create all channels
         params['ch'] = []
-        for i in range(8):
+        for i in range(2):
             params['ch'].append([0,1,1,0])
 
         # activate user-defined channel
@@ -105,7 +107,7 @@ class PicoScope():
         # analogOffset = 0 V
         # self.params = params
         pch = self.params['ch']
-        for i in range(8):
+        for i in range(2):
             if(pch[i][0]==1):
                 self.active_ch.append(i)
             self.status["setCh"] = ps.ps4000aSetChannel(self.chandle, i, pch[i][0], pch[i][1], pch[i][2], pch[i][3])
@@ -134,7 +136,7 @@ class PicoScope():
         """return the config file that is in use"""
         return self.params
     
-    def get(self, number_capture=1, sampling_rate=1e6):
+    def get(self, num_of_captures=1, sampling_rate=1e6):
         """
         Record a set of data using the block acqusition mode from the picoscope
         Parameters
@@ -191,27 +193,29 @@ class PicoScope():
         # Set number of captures
         # handle = chandle
         # nCaptures = 
-        self.status["SetNoOfCaptures"] = ps.ps4000aSetNoOfCaptures(self.chandle, number_capture)
+        self.status["SetNoOfCaptures"] = ps.ps4000aSetNoOfCaptures(self.chandle, num_of_captures)
         
         assert_pico_ok(self.status["SetNoOfCaptures"])
         
         # set up buffers
-        memory_segment=0
-        buffers = np.zeros(shape=(self.Nch,sample_number), dtype=np.int16)
-        for i in range(self.Nch):
-            ch = self.active_ch[i]
-            self.status["setDataBuffersB"] = ps.ps4000aSetDataBuffers(
-                self.chandle, 
-                ch,
-                buffers[i].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)),
-                None, 
-                sample_number,
-                memory_segment,
-                0
-                )
-            
-            assert_pico_ok(self.status["setDataBuffersB"])
-        
+        buffers = {}
+        for capture_idx in range(num_of_captures):
+            buffers[capture_idx] = np.zeros(shape=(self.Nch, sample_number), dtype=np.int16)
+            for i in range(self.Nch):
+                ch = self.active_ch[i]
+                self.status["setDataBuffers" + str(capture_idx)] = ps.ps4000aSetDataBuffers(
+                    self.chandle, 
+                    ch,
+                    buffers[capture_idx][i].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)),
+                    None, 
+                    sample_number,
+                    capture_idx,
+                    0
+                    )
+                
+            assert_pico_ok(self.status["setDataBuffers" + str(capture_idx)])
+
+    
         # run block capture
         # handle = chandle
         # number of pre-trigger samples = preTriggerSamples
@@ -240,7 +244,7 @@ class PicoScope():
             self.status["isReady"] = ps.ps4000aIsReady(self.chandle, ctypes.byref(ready))
         
         # Creates a overlow location for data
-        overflow = (ctypes.c_int16 * number_capture)()
+        overflow = (ctypes.c_int16 * num_of_captures)()
         # Creates converted types maxsamples
         cmaxSamples = ctypes.c_int32(sample_number)
         
@@ -255,7 +259,7 @@ class PicoScope():
             self.chandle, 
             ctypes.byref(cmaxSamples), 
             0, 
-            number_capture-1, 
+            num_of_captures - 1, 
             1, 
             0, 
             ctypes.byref(overflow)
@@ -367,7 +371,7 @@ class RedPitaya:
         
         # make sure the decimation was set
         self.rp.tx_txt('ACQ:DEC?')
-        self.decimation = self.rp.rx_txt()
+        self.dec = self.rp.rx_txt()
         # display('Decimation set to: ' + str(self.rp.rx_txt()))
         # print('Red Pitaya daq loaded - decimation set to: ' + str(self.rp.rx_txt()))
 
@@ -398,8 +402,8 @@ class RedPitaya:
             if fourier:
                 self.buff_ffts[i] = (np.fft.fft(self.buffs[i]) / self.num_of_samples)**2 # it is squared to convert to power
             
-        # return self.buffs, self.buff_ffts
-        return self.buffs
+        return self.buffs, self.buff_ffts
+        # return self.buffs
 
         
     def plot_timetrace(self, idx=1):
@@ -429,7 +433,7 @@ class RedPitaya:
         dBm = 10 * np.log10(power / (0.001 * 50))
         return dBm
     
-    def calc_fft(self, freq_range=(100, 1500), log=True):
+    def calc_fft(self, freq_range=(1000, 10000), log=True):
         
         freq_min, freq_max = freq_range
         self.freq, self.freq2plot = self._calc_fftfreq()
@@ -456,7 +460,7 @@ class RedPitaya:
         self.fft_df.plot(x='Freq', y='FFT', ax=ax)
         # ax.plot(self.freq2plot, np.sqrt(fft_avgd), label='Current Circuit')
 
-        ax.set_title('Power Density Spectrum (' + str(self.num_of_avg) + ' average)');
+        # ax.set_title('Power Density Spectrum (' + str(self.num_of_avg) + ' average)');
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel('Displacement (dBm)')
         # ax.set_yscale('log')
