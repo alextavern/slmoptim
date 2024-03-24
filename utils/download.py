@@ -25,40 +25,45 @@ class PicoScope():
     """
     
     def __init__(self, **config):
+            # hardware constants
+            self.SAMPLE_RATE = 80e6
+            self.NUM_OF_CHANNELS = 2
+        
             # Create chandle and status ready for use
             self.chandle = ctypes.c_int16()
             self.status = {}
-            # self.params = {}#TODO
             self.active_ch = []
 
+            # parameters and attributes
             self.config = config
-            self.params = self.config_constructor()
-            
-    def config_constructor(self):
-        # get params
-        channel = self.config['channel']
-        coupling = self.config['coupling']
-        voltage_range = self.config['range']
-        offset = self.config['offset']
-        trigger = self.config['trigger']
-        num_of_samples = self.config['num_of_samples']
+            self._get_params(**config)
+            self.params = self._config_constructor()
+
+    def _get_params(self, **config):
+        for key, value in config.items():
+            setattr(self, key, value) # sets the instanitated class as an attrinute of this class
+
+    def _config_constructor(self):
         
         # create here new dict that the picoscope can understand
         params = {}
 
         # create all channels
         params['ch'] = []
-        for i in range(2):
+        for i in range(self.NUM_OF_CHANNELS):
             params['ch'].append([0,1,1,0])
 
         # activate user-defined channel
-        params['ch'][channel] = [1, coupling, voltage_range, offset] # chan A
+        params['ch'][self.channel] = [1, self.coupling, self.voltage_range, self.offset] 
 
         # set trigger
-        params['trigger'] = [trigger, 0, 1024, 2, 0, 1000]
+        params['trigger'] = [self.trigger, 0, 1024, 2, 0, 1000]
 
         # num of samples
-        params['num_of_samples'] = num_of_samples
+        params['num_of_samples'] = self.num_of_samples
+        
+        # sampling rate
+        params['sampling_rate'] = self.sampling_rate
         
         return params
     
@@ -107,7 +112,7 @@ class PicoScope():
         # analogOffset = 0 V
         # self.params = params
         pch = self.params['ch']
-        for i in range(2):
+        for i in range(self.NUM_OF_CHANNELS):
             if(pch[i][0]==1):
                 self.active_ch.append(i)
             self.status["setCh"] = ps.ps4000aSetChannel(self.chandle, i, pch[i][0], pch[i][1], pch[i][2], pch[i][3])
@@ -136,7 +141,7 @@ class PicoScope():
         """return the config file that is in use"""
         return self.params
     
-    def get(self, num_of_captures=1, sampling_rate=1e6):
+    def get(self):
         """
         Record a set of data using the block acqusition mode from the picoscope
         Parameters
@@ -149,6 +154,7 @@ class PicoScope():
             sampling rate in Hz. (default =1)
             Minimal timebase is 12.5 ns, thus if the sampling is not a multiple of 12.5 ns,
             the closest value below the requested sampling rate will be used 
+            this should be called re-sampling.
 
          Returns
         -------
@@ -165,15 +171,14 @@ class PicoScope():
         # pointer to maxSamples = ctypes.byref(returnedMaxSamples)
         # segment index = 0
         
-        sample_number = self.params['num_of_samples']
-        self.timebase = int(80e6 / sampling_rate - 1 ) # 1 MS/s
+        self.timebase = int(self.SAMPLE_RATE / self.sampling_rate - 1 ) # 1 MS/s
         timeIntervalns = ctypes.c_float()
         returnedMaxSamples = ctypes.c_int32()
         oversample = ctypes.c_int16(1)
         self.status["getTimebase2"] = ps.ps4000aGetTimebase2(
             self.chandle, 
             self.timebase, 
-            sample_number,
+            self.num_of_samples,
             ctypes.byref(timeIntervalns), 
             ctypes.byref(returnedMaxSamples), 
             0
@@ -185,7 +190,7 @@ class PicoScope():
         
         self.status["setMemorySegments"] = ps.ps4000aMemorySegments(
             self.chandle, 
-            10, 
+            self.num_of_avg, 
             ctypes.byref(nMaxSamples))
         
         assert_pico_ok(self.status["setMemorySegments"])
@@ -193,22 +198,22 @@ class PicoScope():
         # Set number of captures
         # handle = chandle
         # nCaptures = 
-        self.status["SetNoOfCaptures"] = ps.ps4000aSetNoOfCaptures(self.chandle, num_of_captures)
+        self.status["SetNoOfCaptures"] = ps.ps4000aSetNoOfCaptures(self.chandle, self.num_of_avg)
         
         assert_pico_ok(self.status["SetNoOfCaptures"])
         
         # set up buffers
-        buffers = {}
-        for capture_idx in range(num_of_captures):
-            buffers[capture_idx] = np.zeros(shape=(self.Nch, sample_number), dtype=np.int16)
+        self.buffers = {}
+        for capture_idx in range(self.num_of_avg):
+            self.buffers[capture_idx] = np.zeros(shape=(self.Nch, self.num_of_samples), dtype=np.int16)
             for i in range(self.Nch):
                 ch = self.active_ch[i]
                 self.status["setDataBuffers" + str(capture_idx)] = ps.ps4000aSetDataBuffers(
                     self.chandle, 
                     ch,
-                    buffers[capture_idx][i].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)),
+                    self.buffers[capture_idx][i].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)),
                     None, 
-                    sample_number,
+                    self.num_of_samples,
                     capture_idx,
                     0
                     )
@@ -229,10 +234,10 @@ class PicoScope():
         self.status["runBlock"] = ps.ps4000aRunBlock(
             self.chandle, 
             0, 
-            sample_number, 
+            self.num_of_samples, 
             self.timebase, 
             None, 
-            0, 
+            0,  
             None, 
             None)
         
@@ -244,9 +249,9 @@ class PicoScope():
             self.status["isReady"] = ps.ps4000aIsReady(self.chandle, ctypes.byref(ready))
         
         # Creates a overlow location for data
-        overflow = (ctypes.c_int16 * num_of_captures)()
+        overflow = (ctypes.c_int16 * self.num_of_avg)()
         # Creates converted types maxsamples
-        cmaxSamples = ctypes.c_int32(sample_number)
+        cmaxSamples = ctypes.c_int32(self.num_of_samples)
         
         # collect data 
         # handle = chandle
@@ -259,15 +264,41 @@ class PicoScope():
             self.chandle, 
             ctypes.byref(cmaxSamples), 
             0, 
-            num_of_captures - 1, 
+            self.num_of_avg - 1, 
             1, 
             0, 
             ctypes.byref(overflow)
             )
         
         assert_pico_ok(self.status["getValuesBulk"])
-        return buffers
+        
+        if self.fourier:
+            for key, value in self.buffers.items():
+                self.buffers[key] = np.fft.fft(value[0] / self.num_of_samples)**2 # it is squared to convert to power
 
+            self.buffers = self._average_buff_fftdBm() 
+
+        return self.buffers
+    
+    @staticmethod
+    def _psd2dBm(power):
+        dBm = 10 * np.log10(power / (0.001 * 50))
+        return dBm
+
+    def _calc_fftfreq(self):
+        timestep = 1 / self.sampling_rate
+        freq = pd.Series(np.fft.fftfreq(self.num_of_samples, d=timestep))
+        return freq[0:int(freq.size / 2)]
+
+    def _average_buff_fftdBm(self):
+        freq = self._calc_fftfreq()
+        fft_avgd = np.zeros(int(freq.size / 2))
+        for value in self.buffers.values():
+            temp = 2 * np.abs(value[0:int(freq.size / 2)]) / self.num_of_avg
+            fft_avgd += temp
+        fft_avgd_dBm = self._psd2dBm(fft_avgd)
+        return fft_avgd_dBm
+        #
     def stop(self):
         """Stop and close the picoscope"""
         # Stop the scope
@@ -383,7 +414,7 @@ class RedPitaya:
         server = scpi(self.IP)
         return server
 
-    def get(self, fourier=False):
+    def get(self, fourier=True):
         """ get time trace from redpitaya
         """
         # do the acquisitions and save it in the computers memory (not on the Red Pitaya).
@@ -401,8 +432,7 @@ class RedPitaya:
             self.buffs[i] = list(map(float, buff_string))
             if fourier:
                 self.buff_ffts[i] = (np.fft.fft(self.buffs[i]) / self.num_of_samples)**2 # it is squared to convert to power
-            
-        return self.buffs, self.buff_ffts
+        return self.buff_ffts if fourier else self.buffs
         # return self.buffs
 
         
