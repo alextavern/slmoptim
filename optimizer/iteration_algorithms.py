@@ -191,7 +191,7 @@ class ContinuousSequential(IterationAlgos):
                         time.sleep(0.2) # to make sure that data will be sent
 
                         # calculate cost here
-                        corr_k = self.callback(frame[0]) # careful at the zero index, it is only for the picoscope!
+                        corr_k = self.callback(frame)
                         corr.append(corr_k)
 
                     counter += 1 

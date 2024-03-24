@@ -278,7 +278,16 @@ class PicoScope():
 
             self.buffers = self._average_buff_fftdBm() 
 
-        return self.buffers
+        return self.buffers[self.frequency_range[0]:self.frequency_range[1]]
+    
+    def plot_fft(self):
+        if self.fourier:
+            freq = self._calc_fftfreq()
+            fig = plt.figure()
+            plt.plot(freq, self.buffers)
+            return fig
+        else:
+            print("no spectrum to plot")
     
     @staticmethod
     def _psd2dBm(power):
@@ -288,13 +297,14 @@ class PicoScope():
     def _calc_fftfreq(self):
         timestep = 1 / self.sampling_rate
         freq = pd.Series(np.fft.fftfreq(self.num_of_samples, d=timestep))
-        return freq[0:int(freq.size / 2)]
+        freq2plot = freq[0:int(freq.size / 2)]
+        return freq2plot
 
     def _average_buff_fftdBm(self):
-        freq = self._calc_fftfreq()
-        fft_avgd = np.zeros(int(freq.size / 2))
+        # freq = self._calc_fftfreq()
+        fft_avgd = np.zeros(int(self.num_of_samples / 2))
         for value in self.buffers.values():
-            temp = 2 * np.abs(value[0:int(freq.size / 2)]) / self.num_of_avg
+            temp = 2 * np.abs(value[0:int(self.num_of_samples / 2)]) / self.num_of_avg
             fft_avgd += temp
         fft_avgd_dBm = self._psd2dBm(fft_avgd)
         return fft_avgd_dBm
