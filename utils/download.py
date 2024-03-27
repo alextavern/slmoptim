@@ -12,7 +12,7 @@ import sys
 sys.path.append("/usr/lib/python3/dist-packages/")
 from metavision_core.event_io.raw_reader import initiate_device, RawReader
 from metavision_sdk_core import OnDemandFrameGenerationAlgorithm
-from metavision_hal import I_ROI, I_LL_Biases
+from metavision_hal import I_ROI, I_LL_Biases, I_ErcModule
 import time
 
 class PropheseeCamera():
@@ -38,10 +38,16 @@ class PropheseeCamera():
         self.cam_stream = RawReader.from_device(device=self.camera)
         self.frameGen = OnDemandFrameGenerationAlgorithm(width = self.width, height = self.height)
         self.frameGen.set_accumulation_time_us(self.accumulation_time)
+        
+        # roi 
         if self.roi_size_x != 0:
             self.roi_size_off_x, self.roi_size_off_y = self.roi_off
             self.camera.get_i_roi().set_window(self.camera.get_i_roi().Window(self.roi_size_off_x, self.roi_size_off_y, self.roi_size, self.roi_size)) 
             self.camera.get_i_roi().enable(True)
+        
+        # limitation of the event rate ( above 3e7 it is slow )
+        self.camera.get_i_erc_module().set_cd_event_rate(20000000)
+        self.camera.get_i_erc_module().enable(True)
         
         return self.camera
     
@@ -64,12 +70,13 @@ class PropheseeCamera():
             self.cam_stream.seek_time((time.time() - self.init_time) * 1e6 - self.accumulation_time)
             
             # load and process the events of the last accumulation_time period
-            events = self.cam_stream.load_delta_t(self.accumulation_time)
-            # while events.size == 0:
-            #    events = self.cam_stream.load_delta_t(self.accumulation_time)
-            self.frameGen.process_events(events)
+            events = self.cam_stream.load_delta_t(self.accumulation_time)            
             frame = np.zeros((self.height, self.width, 3), np.uint8)
-            self.frameGen.generate(events['t'][-1], frame)
+
+            if events.size != 0: # if for some reason there were no event, it output a np array of zeros
+                self.frameGen.process_events(events)
+                frame = np.zeros((self.height, self.width, 3), np.uint8)
+                self.frameGen.generate(events['t'][-1], frame)
             img = np.mean(frame, axis = 2)
         
         return img
