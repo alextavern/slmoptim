@@ -1,11 +1,4 @@
-from . import phase_conjugation
-from ..loader import patterns as pt
-from ..utils import upload as up
-from ..utils import download as down
-from ..utils.misc import get_params
-
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from slmPy import slmpy
 from scipy.linalg import hadamard
 import threading
 from tqdm.auto import tqdm
@@ -16,7 +9,11 @@ import time
 import os
 import warnings
 
-
+from . import phase_conjugation
+from ..loader import patterns as pt
+from ..utils import slm as up
+from ..utils import download as down
+from ..utils.misc import get_params
 
 """
 """
@@ -48,10 +45,12 @@ class measTM:
         self.pattern_loader = pattern_loader
         
         # general parameters
-        self._get_params(**config['method'])
+        get_params(**config['method'])
+        # self._get_params(**config['method'])
 
         # SLM settings
-        self._get_params(**config['hardware']['slm']['params'])
+        get_params(**config['hardware']['slm']['params'])
+        # self._get_params(**config['hardware']['slm']['params'])
 
         resX, resY = self.resolution
         self.patternSLM = pt.PatternsBacic(resX, resY)

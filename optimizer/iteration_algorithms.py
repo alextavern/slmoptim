@@ -1,14 +1,17 @@
 import numpy as np
-import time, os, types
+import time
+import os
+import types
 import pickle
 from tqdm.auto import tqdm
 from tqdm import trange
-from ..loader import patterns as pt
-from ..utils.misc import create_filepath
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 from aotools.functions import phaseFromZernikes, zernike_noll
-import time
+
+from ..loader import patterns as pt
+# from ..utils.misc import create_filepath
 
 
 class IterationAlgos():

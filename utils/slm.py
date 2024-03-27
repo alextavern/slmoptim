@@ -4,7 +4,7 @@ from tqdm.auto import tqdm
 import numpy as np
 import time, cv2
 from slmPy import slmpy
-from ..utils.misc import get_params
+from .misc import get_params
 
 
 def set_mirror(slm, resolution=(800, 600)):

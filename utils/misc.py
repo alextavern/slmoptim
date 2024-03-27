@@ -1,11 +1,12 @@
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from . import camera_func as cam
 import matplotlib.pyplot as plt
-from ..loader import patterns as  pt
 import numpy as np
-import time, pickle, os
+import pickle
+import time
+import os
 
-
+from . import zelux as cam
+from ..loader import patterns as  pt
 
 
 def get_params(self, **config):
@@ -52,7 +53,6 @@ def pattern_frame(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600
     
     return pattern, frame
 
-
 def two_frames(frame1, frame2, norm=True):
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 10), sharex=True, sharey=True)
@@ -79,7 +79,7 @@ def two_frames(frame1, frame2, norm=True):
     fig.tight_layout()
     return fig
 
-def create_filepath(self, **kwargs):
+def _create_filepath(self):
     """ creates a filepath to save data
     """
 
@@ -94,19 +94,9 @@ def create_filepath(self, **kwargs):
     if not isExist:
         os.makedirs(new_path)
     
-    # create the filename based on kwargs    
-    date_time_str = time.strftime("%Y%m%d-%H:%M")
-    filename = str(date_time_str)
-    for key, value in kwargs.items():
-        filename += '_'
-        filename += str(key) +  str(value)
-    
-    # filename = '{}_tm_raw_data_num_in{}_slm_macro{}'.format(date_time_str,  
-    #                                                         self.num_in, 
-    #                                                         self.slm_macropixel_size)
-    #filename = '{}_'.format(date_time_str) + '{}_raw_data_num_in{}_slm_macro{}'.format(self.type, 
-    #                                                                                   self.num_in, 
-    #                                                                                   self.slm_macropixel_size)
+    filename = '{}_tm_raw_data_num_in{}_slm_macro{}'.format(date_time_str,  
+                                                            self.num_in, 
+                                                            self.macropixel)
     
     if self.save_path:
         self.filepath = os.path.join(new_path, filename)
@@ -114,36 +104,7 @@ def create_filepath(self, **kwargs):
         self.filepath = filename
         
     return self.filepath
-    
-# def create_filepath(self):
-#     """ creates a filepath to save data
-#     """
 
-#     date_str = time.strftime("%Y%m%d")
-#     date_time_str = time.strftime("%Y%m%d-%H:%M")
-    
-#     new_path = os.path.join(self.save_path, date_str)
-    
-#     # check if dir exists
-#     isExist = os.path.exists(new_path)
-#     # and create it
-#     if not isExist:
-#         os.makedirs(new_path)
-    
-#     # filename = '{}_tm_raw_data_num_in{}_slm_macro{}'.format(date_time_str,  
-#     #                                                         self.num_in, 
-#     #                                                         self.slm_macropixel_size)
-#     filename = '{}_'.format(date_time_str) + '{}_raw_data_num_in{}_slm_macro{}'.format(self.type, 
-#                                                                                        self.num_in, 
-#                                                                                        self.slm_macropixel_size)
-    
-#     if self.save_path:
-#         self.filepath = os.path.join(new_path, filename)
-#     else:
-#         self.filepath = filename
-        
-#     return self.filepath
-        
 def save_raw(self):
     """ saves raw data to a pickle format
     """

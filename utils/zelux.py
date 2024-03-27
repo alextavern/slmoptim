@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import ndimage
 
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 

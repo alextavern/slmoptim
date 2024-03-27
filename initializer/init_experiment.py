@@ -1,20 +1,28 @@
-from ..utils.download import ZeluxCamera, RedPitaya, PropheseeCamera, PicoScope
-from ..utils.upload import SpatialLightModulator
+from ..utils.zelux import ZeluxCamera
+from ..utils.prophesee import PropheseeCamera
+from ..utils.redpitaya import RedPitaya
+from ..utils.picoscope import PicoScope
+from ..utils.slm import SpatialLightModulator
 
 
 # inspired by this simple illustration of the factory method design pattern in python
-#https://medium.com/@vadimpushtaev/python-choosing-subclass-cf5b1b67c696
+# https://medium.com/@vadimpushtaev/python-choosing-subclass-cf5b1b67c696
 
 """ This class is used to initialize the hardware parts ot the experiment.
     In order to make adjustable for different hardware components in the future, 
     a simple class (InitExperiment) is used to instantiate classes with the hardware
     parameters. The user needs only to provide the class and add it manually to the
     mapping. 
-    Here, the SLM - using slmpy - the Zelux Thorcam - using the thorlabs SDK and 
-    a RedPitaya card are implemented.
+    The following hardare types are implementer:
     
-    This class can be used either using an external configuration yaml file or by 
-    using the classmethod decorated create_hardware to create a component individually
+    a/ SLM, using slmpy by Popoff,
+    b/ the Zelux Thorcam, using the thorlabs SDK, 
+    c/ the RedPitaya card,
+    d/ the Picoscope, using pico SDK
+    e/ a Prophesee event-based camera.
+    
+    This class needs an external configuration yaml file including the parameters (see docs)
+    When auto is false, the classmethod decorated create_hardware to create a component individually
     for testing purposes.
     
     e.g. to create a hardware component:
@@ -75,8 +83,5 @@ class InitExperiment():
         
         if hardware_type not in HARDWARE_TYPE_TO_CLASS_MAP:
             raise ValueError('Bad hardware type {}'.format(hardware_type))
-        
-        # print('{} parameters are:'.format(hardware_type))
-        # print(params)
     
         return HARDWARE_TYPE_TO_CLASS_MAP[hardware_type](**params)
