@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 
 from .redpitaya_scpi import scpi
-from .misc import get_params
 
 class RedPitaya:
 

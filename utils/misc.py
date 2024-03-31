@@ -8,11 +8,50 @@ import os
 from . import zelux as cam
 from ..loader import patterns as  pt
 
+class CommonMethods:
+    """ A mixin class containing methods that other classes use
+    """
+    
+    def get_params(self, **config):
 
-def get_params(self, **config):
+        for key, value in config.items():
+            setattr(self, key, value) # sets the instanitated class as an attrinute of this class            
 
-    for key, value in config.items():
-        setattr(self, key, value) # sets the instanitated class as an attrinute of this class            
+    def create_filepath(self):
+        """ creates a filepath to save data
+        """
+
+        date_str = time.strftime("%Y%m%d")
+        date_time_str = time.strftime("%Y%m%d-%H:%M")
+        
+        new_path = os.path.join(self.save_path, date_str)
+        
+        # check if dir exists
+        isExist = os.path.exists(new_path)
+        # and create it
+        if not isExist:
+            os.makedirs(new_path)
+        
+        filename = '{}_{}_raw_data_num_in{}_slm_macro{}'.format(
+            date_time_str,
+            self.type,
+            self.slm_segments, 
+            self.macropixel
+            )
+
+        if self.save_path:
+            self.filepath = os.path.join(new_path, filename)
+        else:
+            self.filepath = filename
+            
+        return self.filepath
+
+    def save_raw(self):
+        """ saves raw data to a pickle format
+        """
+
+        with open(self.filepath + '.pkl', 'wb') as fp:
+            pickle.dump((self.frames), fp)
 
 def pattern_frame(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600),
                   off=(0, 0), 
@@ -79,35 +118,3 @@ def two_frames(frame1, frame2, norm=True):
     fig.tight_layout()
     return fig
 
-def _create_filepath(self):
-    """ creates a filepath to save data
-    """
-
-    date_str = time.strftime("%Y%m%d")
-    date_time_str = time.strftime("%Y%m%d-%H:%M")
-    
-    new_path = os.path.join(self.save_path, date_str)
-    
-    # check if dir exists
-    isExist = os.path.exists(new_path)
-    # and create it
-    if not isExist:
-        os.makedirs(new_path)
-    
-    filename = '{}_tm_raw_data_num_in{}_slm_macro{}'.format(date_time_str,  
-                                                            self.num_in, 
-                                                            self.macropixel)
-    
-    if self.save_path:
-        self.filepath = os.path.join(new_path, filename)
-    else:
-        self.filepath = filename
-        
-    return self.filepath
-
-def save_raw(self):
-    """ saves raw data to a pickle format
-    """
-
-    with open(self.filepath + '.pkl', 'wb') as fp:
-        pickle.dump((self.data_out), fp)

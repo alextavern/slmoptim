@@ -9,12 +9,6 @@ from picosdk.functions import assert_pico_ok
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
 from .redpitaya_scpi import scpi
-from .misc import get_params
-
-
-    
-
-    
         
 class FrameAcquisitionThread(threading.Thread):
     

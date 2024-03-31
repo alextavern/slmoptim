@@ -3,13 +3,13 @@ from scipy import ndimage
 
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
-from .misc import get_params
+from .misc import CommonMethods
 
-class ZeluxCamera():
+class ZeluxCamera(CommonMethods):
     
     def __init__(self, **config):
         print("Zelux camera initiliazed - use init_cam() to arm and trigger it and get() to get frames")
-        get_params(self, **config)
+        CommonMethods.get_params(self, **config)
     
     def set_roi(self):
         """ Calculates the Region of interest. The user gives a window size and x, y offsets from
