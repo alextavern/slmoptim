@@ -158,13 +158,22 @@ class measTM(CommonMethods):
         return self.frames
             
 
-class calcTM(measTM):
+class calcTM(CommonMethods):
 
-    def __init__(self, slm, camera, pattern_loader, data, **config):
-        super().__init__(slm, camera, pattern_loader, **config)
+    def __init__(self, data, pattern_loader=None, **config):
 
         self.data = data
         self.loader = pattern_loader
+        
+        # general parameters
+        CommonMethods.get_params(self, **config['method'])
+        
+        # SLM settings
+        CommonMethods.get_params(self, **config['hardware']['slm']['params'])
+        
+        # define a filename
+        self.filepath = CommonMethods.create_filepath(self)
+        self.resX, self.resY = self.resolution
 
     @staticmethod
     def _four_phases_method(intensities):
@@ -246,12 +255,12 @@ class calcTM(measTM):
             factors diagonal matrix
         """
         norm_factors = self._normalization_factors()
-        tm_fil = norm_factors@self.tm_obs
+        tm_filtered = norm_factors@self.tm_obs
         # tm_fil = np.dot(norm_factors, self.tm_obs)
-        return tm_fil
+        return tm_filtered
     
     def _had2canonical(self):
-        """ Perform a basis change: from the hadamard to the canonical one
+        """ Performs a basis change: from the hadamard to the canonical one
             by calculating the dot product between the measured TM and the hadamard
             matrix on which the basis is created
         """
@@ -261,7 +270,8 @@ class calcTM(measTM):
         return h
 
     def _change_to_canonical_basis(self, matrix, loader):
-        
+        """ Constructs a passage matrix for the basis change
+        """
         if loader:
             passage = []
             # here we iterate through every vector in the loader, 
@@ -279,12 +289,12 @@ class calcTM(measTM):
         return tm_can
     
     def calc_tm(self):
+        
         self.tm_obs = self._calc_obs()
         self.tm_fil = self._normalize()
         self.tm = self._change_to_canonical_basis(self.tm_fil, self.loader)
         
         return self.tm_obs, self.tm_fil, self.tm
-    
     
     def plot_tm(self, figsize=(10, 5)):
             
@@ -314,15 +324,13 @@ class calcTM(measTM):
         fig.tight_layout()
         
         figpath = self.filepath + 'tm'
-        plt.savefig(figpath, dpi=200, transparent=True)
+        plt.savefig(figpath, dpi=300, transparent=True)
         
         return fig
         
         # return self.tm_obs, self.tm_fil, self.tm  
     
-    def fit(self, camera, slm, tgt_offset=(0, 0), tgt_size=(1, 1)): 
-        """ Performs phase conjugation
-        """
+    def _define_target(self, tgt_offset, tgt_size):
         
          # define target
         target_shape = (int(self.tm.shape[0] ** 0.5), int(self.tm.shape[0] ** 0.5))
@@ -333,29 +341,46 @@ class calcTM(measTM):
 
         target_frame = tgt.square(tgt_size, offset_x=x, offset_y=y, intensity=1)
         # target_frame = tgt.gauss(num=16, order=0, w0=1e-4, slm_calibration_px=112)
-
+        
+        return target_frame
+    
+    def fit(self, camera, slm, tgt_offset=(0, 0), tgt_size=(1, 1), plot=True): 
+        """ Performs phase conjugation
+        """
+        
+        self.camera = camera
+        self.slm = slm
+        
+        target_frame = self._define_target(tgt_offset, tgt_size)
+        
         # phase conjugation - create mask
         msk = phase_conjugation.InverseLight(
             target_frame, 
             self.tm, 
             slm_macropixel=self.macropixel, 
-            calib_px=112)
+            calib_px=self.gray_calibration)
         
         phase_mask = msk.inverse_prop(conj=True)
 
         # merge phase mask into an slm pattern
         patternSLM = pt.PatternsBacic(self.resX, self.resY)
-        focusing_mask = patternSLM.pattern_to_SLM(phase_mask, gray = 10)
+        self.focusing_mask = patternSLM.pattern_to_SLM(phase_mask, gray = 10)
 
         # apply mask
-        self.slm.sendArray(focusing_mask)
-        time.sleep(0.2)
+        self.slm.sendArray(self.focusing_mask)
+        time.sleep(0.2)  
+            
+        if plot:
+            speckle, focus, fig = self.plot()
+            return self.focusing_mask, speckle, focus, fig
+    
+            
+        return self.focusing_mask
+    
+    def plot(self):
 
-        # and plot/save
-        
-        # get frame
-        frame = self.camera.get_pending_frame_or_null()
-        frame_focus = np.copy(frame.image_buffer)
+        # get frame with focus mask
+        frame_focus = self.camera.get()
         profile_line = len(frame_focus) // 2 
 
         # set mirror to get speckle
@@ -363,13 +388,12 @@ class calcTM(measTM):
         mirror = patSLM.mirror()
         self.slm.sendArray(mirror)
         time.sleep(.2)
-        frame = self.camera.get_pending_frame_or_null()
-        frame_speck = np.copy(frame.image_buffer)
+        frame_speckle = self.camera.get()
 
         # do the plotting
         fig, axs = plt.subplots(2, 2, figsize=(10,10))
 
-        speck = axs[0, 0].imshow(frame_speck)
+        speck = axs[0, 0].imshow(frame_speckle)
         axs[0, 0].set_title("Diffusing pattern")
         axs[0, 0].set_xlabel("Camera x px #")
         axs[0, 0].set_ylabel("Camera y px #")
@@ -377,7 +401,10 @@ class calcTM(measTM):
         cax = divider.append_axes("right", size="5%", pad=0.05)
         fig.colorbar(speck, cax=cax)   
 
-        mask = axs[1, 0].imshow(focusing_mask)
+        mask = axs[1, 0].imshow(self.focusing_mask)
+        axs[0, 1].hlines(profile_line, 0, frame_focus.shape[0], colors='#1f77b4', linestyles='dotted')
+        axs[0, 1].vlines(profile_line, 0, frame_focus.shape[1], colors='#ff7f0e', linestyles='dotted')
+
         axs[1, 0].set_title("Focus mask")
         axs[1, 0].set_xlabel("SLM x px #")
         axs[1, 0].set_ylabel("SLM y px #")
@@ -389,12 +416,14 @@ class calcTM(measTM):
         axs[0, 1].set_title("Focusing")
         axs[0, 1].set_xlabel("Camera x px #")
         axs[0, 1].set_ylabel("Camera y px #")
+        
         divider = make_axes_locatable(axs[0, 1])
         cax = divider.append_axes("right", size="5%", pad=0.05)
         fig.colorbar(frame, cax=cax)   
 
-        axs[1, 1].plot(frame_focus[profile_line][:])
-        axs[1, 1].plot(frame_focus[:][profile_line])
+        axs[1, 1].plot(frame_focus[:, profile_line])
+        axs[1, 1].plot(frame_focus[profile_line, :])
+        
         axs[1, 1].set_box_aspect(1)
         axs[1, 1].set_title("Focus profile")
         axs[1, 1].set_xlabel("Camera x px #")
@@ -402,10 +431,16 @@ class calcTM(measTM):
 
         fig.tight_layout()
 
-        self.slm.sendArray(focusing_mask)
+        self.slm.sendArray(self.focusing_mask)
         
-        if self.savepath:
-            figpath = self.savepath
-            plt.savefig(figpath, dpi=200, transparent=True)
-            
-        return fig
+        self.frames = {}
+        self.frames['mask'] = self.focusing_mask
+        self.frames['focus'] = frame_focus
+        self.frames['speckle'] = frame_speckle
+        
+        if self.save_path:
+            figpath = self.filepath + '_fit'
+            plt.savefig(figpath, dpi=300, transparent=True)
+            self.save_raw(type='fit')
+                        
+        return frame_focus, frame_speckle, fig

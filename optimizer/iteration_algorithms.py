@@ -155,10 +155,10 @@ class IterationAlgos():
 
         fig.tight_layout()
         
-        plt.savefig(self.filepath + "png", dpi=400, transparent=True)
-        
-        
-        
+        figpath = self.filepath + 'optim'
+        plt.savefig(figpath, dpi=300, transparent=True)
+                
+
         """ The following classes can be condensed into only one in principle. To do. 
         """
 class ContinuousSequential(IterationAlgos):

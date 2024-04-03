@@ -46,11 +46,11 @@ class CommonMethods:
             
         return self.filepath
 
-    def save_raw(self):
+    def save_raw(self, type='raw'):
         """ saves raw data to a pickle format
         """
 
-        with open(self.filepath + '.pkl', 'wb') as fp:
+        with open(self.filepath + '_' + type + '.pkl', 'wb') as fp:
             pickle.dump((self.frames), fp)
 
 def pattern_frame(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600),
