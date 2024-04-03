@@ -42,21 +42,12 @@ class PropheseeCamera():
         # roi 
         if self.roi_size_x != 0:
             self.roi_size_off_x, self.roi_size_off_y = self.roi_off
-            self.camera.get_i_roi().set_window(self.camera.get_i_roi().Window(self.roi_size_off_x, self.roi_size_off_y, self.roi_size, self.roi_size)) 
+            self.camera.get_i_roi().set_window(self.camera.get_i_roi().Window(self.roi_size_off_x, self.roi_size_off_y, self.roi_size_x, self.roi_size_y)) 
             self.camera.get_i_roi().enable(True)
         
         # limitation of the event rate ( above 3e7 it is slow )
         self.camera.get_i_erc_module().set_cd_event_rate(20000000)
         self.camera.get_i_erc_module().enable(True)
-        
-        return self.camera
-    
-    def close_cam(self):
-        del self.camera
-    
-    def set_accumulation_time(self, accumulation_time):
-        self.accumulation_time = accumulation_time
-        self.frameGen.set_accumulation_time_us(accumulation_time)
 
     def get(self):
         """ Get frame from Prophesee camera
