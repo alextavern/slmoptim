@@ -3,13 +3,16 @@ import pandas as pd
 import numpy as np
 
 from .redpitaya_scpi import scpi
+from ..utils.misc import CommonMethods
 
-class RedPitaya:
+
+class RedPitaya(CommonMethods):
 
     def __init__(self, **config):
         
         # get parameters
-        get_params(self, **config)
+        CommonMethods.get_params(self, **config)
+        # get_params(self, **config)
         
         # launch scpi server - make sure it is manually activated from the redpi interface
         self.rp = self._launch_scpi_server()

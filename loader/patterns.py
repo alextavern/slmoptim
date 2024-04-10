@@ -330,7 +330,7 @@ class PatternsBacic:
     def _enlarge_pattern(matrix, n):
         """
         It takes as input a 2d matrix and augments its dimensions by 2^(n-1) by conserving the same pattern
-        To be removed. The 2^(n-1) factor is not well adapted as it leaed to underfilling the useful slm screen.
+        To be removed. The 2^(n-1) factor is not well adapted as it leads to underfilling of the effectif slm screen.
         Parameters
         ----------
         matrix: input 2d array

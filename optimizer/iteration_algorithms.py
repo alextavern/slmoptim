@@ -11,10 +11,11 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from aotools.functions import phaseFromZernikes, zernike_noll
 
 from ..loader import patterns as pt
+from ..utils.misc import CommonMethods
 # from ..utils.misc import create_filepath
 
 
-class IterationAlgos():
+class IterationAlgos(CommonMethods):
     """ This is the base class to be used for various iteration based algorithms for optimization
         including Stepwise Sequential (SSA), Continuous Sequential (CSA), Random Partition (RPA) 
         and Hadamard Partition (HPA) algorithms. 
@@ -29,17 +30,20 @@ class IterationAlgos():
         self.pattern_loader = pattern_loader
         
         # general parameters
-        self._get_params(**config['method'])
+        # self._get_params(**config['method'])
+        CommonMethods.get_params(self, **config['method'])
 
         # SLM settings
-        self._get_params(**config['hardware']['slm']['params'])
+        CommonMethods.get_params(self, **config['hardware']['slm']['params'])
         self.N = int(self.slm_segments ** 0.5)
 
         resX, resY = self.resolution
         self.patternSLM = pt.PatternsBacic(resX, resY)
                 
         # define a filename
-        self.filepath = self._create_filepath()
+        # self.filepath = self._create_filepath()
+        # define a filename
+        self.filepath = CommonMethods.create_filepath(self)
      
     def _get_params(self, **config):
         for key, value in config.items():
@@ -114,11 +118,7 @@ class IterationAlgos():
             self.filepath = self.filename
             
         return self.filepath
-    
-    def save_raw(self):      
 
-        with open(self.filepath + 'pkl', 'wb') as fp:
-            pickle.dump(self.data_out, fp)
             
     def plot(self, frame, idx):
         
@@ -211,7 +211,11 @@ class ContinuousSequential(IterationAlgos):
                     pat_epoch.set_postfix(Cost=np.max(corr))
                     pat_epoch.refresh()
 
-
+        self.data_out = {}
+        self.data_out['pattern'] = self.final_pattern
+        self.data_out['cost'] = self.cost
+        self.data_out['frames'] = self.frames
+        
         return self.final_pattern, self.cost, self.frames
     
 

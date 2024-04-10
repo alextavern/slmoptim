@@ -12,7 +12,7 @@ import warnings
 from . import phase_conjugation
 from ..loader import patterns as pt
 from ..utils import slm as up
-from ..utils import download as down
+from ..utils import threads as down
 from ..utils.misc import CommonMethods
 
 """
@@ -152,10 +152,10 @@ class measTM(CommonMethods):
 
                 self.frames.append(frame)
                 
-
+        self.data_out = self.frames
         print("TM acquisition completed ! ")
             
-        return self.frames
+        return self.data_out
             
 
 class calcTM(CommonMethods):

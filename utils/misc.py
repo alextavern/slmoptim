@@ -51,7 +51,7 @@ class CommonMethods:
         """
 
         with open(self.filepath + '_' + type + '.pkl', 'wb') as fp:
-            pickle.dump((self.frames), fp)
+            pickle.dump((self.data_out), fp)
 
 def pattern_frame(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600),
                   off=(0, 0), 
@@ -116,5 +116,15 @@ def two_frames(frame1, frame2, norm=True):
 
     fig.text(-0.01, 0.5, 'camera pixels y #', va='center', rotation='vertical')
     fig.tight_layout()
-    return fig
+    
+def set_mirror(slm, resX=800, resY=600):
+    patSLM = pt.PatternsBacic(resX, resY)
+    mirror = patSLM.mirror()
+    slm.sendArray(mirror)
+    time.sleep(.2)
 
+def set_cross_had(slm, resX=800, resY=600, idx=17*8):
+    had_loader = pt.HadamardPatternGenerator(256, 112)
+    patSLM = pt.PatternsBacic(resX, resY)
+    cross = patSLM.pattern_to_SLM(had_loader[idx], 15)
+    slm.sendArray(cross)
