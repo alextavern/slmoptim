@@ -211,7 +211,6 @@ class ContinuousSequential(IterationAlgos):
                         corr.append(corr_k)
 
                     counter += 1 
-                    print(counter, np.max(corr))
                     self.frames[counter] = frame
 
                     # update pattern with max corr

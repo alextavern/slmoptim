@@ -49,6 +49,7 @@ def peak_2_peak(time_series):
     return np.ptp(time_series)
 
 def intensity(frame):
-    return np.sum(frame) / (frame.shape[0] * frame.shape[1])
+    return np.sum(frame)
+    # return np.sum(frame) / (frame.shape[0] * frame.shape[1])
 
     
