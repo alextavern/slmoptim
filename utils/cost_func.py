@@ -18,6 +18,20 @@ def correlation_coefficient(X, Y):
     return corr_coeff
 
 
+def signal_to_noise_ration2d(data, mask_radius=1):
+
+    center = np.argmax(data)
+
+    X = np.arange(len(data))
+    # We generate a mask representing the disk we want to intensity to be concentrated in
+    mask = (X - center) ** 2 < mask_radius ** 2
+    
+    signal = np.sum((data) * mask) / np.sum(mask)
+    noise = np.sum((data) * (1. - mask)) / np.sum(1. - mask)
+    cost = signal - noise  # substraction because input signal is in dB
+    
+    return cost
+
 def signal_to_noise_ratio(frame, mask_radius=8, mask_offset=(0, 0), intesity_only=False):
     """ Thank you S. Popoff
         Creates mask with a disk in the center and calculates the ratio of the
