@@ -46,7 +46,7 @@ class InitExperiment():
                     hardware_params = config['hardware'][component]['params'] # extract hardware params
                     new_hardware = self.create_hardware(class_name, **hardware_params)
 
-                    setattr(self, component, new_hardware) # sets the instanitated class as an attrinute of this class
+                    setattr(self, component, new_hardware) # sets the instantiated class as an attrinute of this class
 
             else: 
                 pass

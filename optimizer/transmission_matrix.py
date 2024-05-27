@@ -433,10 +433,10 @@ class calcTM(CommonMethods):
 
         self.slm.sendArray(self.focusing_mask)
         
-        self.frames = {}
-        self.frames['mask'] = self.focusing_mask
-        self.frames['focus'] = frame_focus
-        self.frames['speckle'] = frame_speckle
+        self.data_out = {}
+        self.data_out['mask'] = self.focusing_mask
+        self.data_out['focus'] = frame_focus
+        self.data_out['speckle'] = frame_speckle
         
         if self.save_path:
             figpath = self.filepath + '_fit'

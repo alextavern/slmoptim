@@ -1,36 +1,32 @@
 import numpy as np
 import time
 import os
-import types
-import pickle
 from tqdm.auto import tqdm
 from tqdm import trange
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from aotools.functions import phaseFromZernikes, zernike_noll
-
 from ..loader import patterns as pt
 from ..utils.misc import CommonMethods
-# from ..utils.misc import create_filepath
 
 
 class IterationAlgos(CommonMethods):
-    """ This is the base class to be used for various iteration based algorithms for optimization
+    """ This is the base class to be used for various iteration based-algorithms for optimization
         including Stepwise Sequential (SSA), Continuous Sequential (CSA), Random Partition (RPA) 
         and Hadamard Partition (HPA) algorithms. 
     """
     
-    def __init__(self, slm, camera, pattern_loader, **config):
+    def __init__(self, slm, data_in, pattern_loader, camera=None, **config):
+
         # hardware objects
         self.slm = slm
-        self.camera = camera 
+        self.data_in = data_in # data_in refers to the component that will deliver data for optim (camera or daq)
+        self.camera = camera
         
         # pattern loader
         self.pattern_loader = pattern_loader
         
         # general parameters
-        # self._get_params(**config['method'])
         CommonMethods.get_params(self, **config['method'])
 
         # SLM settings
@@ -40,9 +36,7 @@ class IterationAlgos(CommonMethods):
         resX, resY = self.resolution
         self.patternSLM = pt.PatternsBacic(resX, resY)
                 
-        # define a filename
-        # self.filepath = self._create_filepath()
-        # define a filename
+        # define a filepath to save data and figs
         self.filepath = CommonMethods.create_filepath(self)
      
     def _get_params(self, **config):
@@ -91,37 +85,10 @@ class IterationAlgos(CommonMethods):
         else:
             self.slm.updateArray(pattern)
         time.sleep(slm_delay)
-    
-    def _create_filepath(self):
-        """ Creates a directory and a filename to save raw data
-            and figures
-        """
-
-        timestr = time.strftime("%Y%m%d")
-        new_path = os.path.join(self.save_path, timestr)
-        
-        # check if dir exists
-        isExist = os.path.exists(new_path)
-        # and create it
-        if not isExist:
-            os.makedirs(new_path)
-        
-        # define a filename
-        filename = '{}_{}'.format(
-            timestr,
-            self.type,
-            )
-        
-        if self.save_path:
-            self.filepath = os.path.join(new_path, filename)
-        else:
-            self.filepath = self.filename
             
-        return self.filepath
+    def plot(self, frame):
+        profile_line = len(frame) // 2 
 
-            
-    def plot(self, frame, idx):
-        
         fig, axs = plt.subplots(2, 2, figsize=(10, 10))
 
         mask = axs[0, 0].imshow(self.final_pattern)
@@ -132,6 +99,8 @@ class IterationAlgos(CommonMethods):
         cax = divider.append_axes("right", size="5%", pad=0.05)
         fig.colorbar(mask, cax=cax)
 
+        axs[0, 1].hlines(profile_line, 0, frame.shape[0], colors='#1f77b4', linestyles='dotted')
+        axs[0, 1].vlines(profile_line, 0, frame.shape[1], colors='#ff7f0e', linestyles='dotted')
         focus_img = axs[0, 1].imshow(frame)
         axs[0, 1].set_title("Focusing")
         axs[0, 1].set_xlabel("Camera x px #")
@@ -146,7 +115,8 @@ class IterationAlgos(CommonMethods):
         axs[1, 0].set_ylabel("Cost function")
         axs[1, 0].set_xlabel("Iterations #")
 
-        axs[1, 1].plot(frame[idx])
+        axs[1, 1].plot(frame[:, profile_line])
+        axs[1, 1].plot(frame[profile_line, :])
         axs[1, 1].set_box_aspect(1)
         axs[1, 1].set_title("Focusing profile")
 
@@ -168,11 +138,17 @@ class ContinuousSequential(IterationAlgos):
         gray = 0
         counter = 0
 
+        # initialize with a zero-filled 2d array
         self.final_pattern = np.array([[gray for _ in range(self.N)] for _ in range(self.N)]).astype('uint8')
         
+        # initialize dicts and lists
+        self.data_out = {}
         self.cost = []
         self.frames = {}
+        if self.camera:
+            frames_camera = {}
 
+        # run
         for iteration in range(1, self.total_iterations+1):   
              
             # sweep each slm pixel
@@ -189,8 +165,7 @@ class ContinuousSequential(IterationAlgos):
                         self.upload_pattern(temp)
 
                         # get input measurement (camera frame/time series/spectrum)
-
-                        frame = self.camera.get()
+                        frame = self.data_in.get()
                         time.sleep(0.2) # to make sure that data will be sent
 
                         # calculate cost here
@@ -199,6 +174,10 @@ class ContinuousSequential(IterationAlgos):
 
                     counter += 1 
                     self.frames[counter] = frame
+                    if self.camera:
+                        frame_camera = self.camera.get()
+                        frames_camera[counter] = frame_camera
+                        self.data_out["frames_camera"] = frames_camera
 
                     # update pattern with max corr
                     self.cost.append(np.max(corr))
@@ -211,13 +190,11 @@ class ContinuousSequential(IterationAlgos):
                     pat_epoch.set_postfix(Cost=np.max(corr))
                     pat_epoch.refresh()
 
-        self.data_out = {}
         self.data_out['pattern'] = self.final_pattern
         self.data_out['cost'] = self.cost
         self.data_out['frames'] = self.frames
-        
-        return self.final_pattern, self.cost, self.frames
-    
+                
+        return self.data_out
 
 class StepwiseSequential(IterationAlgos):
     
@@ -326,8 +303,8 @@ class HadamardPartition(IterationAlgos):
 """
 class CoefficientsOptimization(IterationAlgos):
               
-    def __init__(self, slm, camera, **config):
-        super().__init__(slm, camera, pattern_loader=None, **config)
+    def __init__(self, slm, data_in, camera=None, **config):
+        super().__init__(slm, data_in, pattern_loader=None, camera=camera, **config)
 
 
     def register_cost_callback(self, callback):
@@ -407,6 +384,8 @@ class CoefficientsOptimization(IterationAlgos):
         counter = 0
         self.data_out = {}
         frames = {}
+        if self.camera:
+            frames_camera = {}
         masks = {}
         cost = []
         
@@ -415,40 +394,46 @@ class CoefficientsOptimization(IterationAlgos):
         # get coeff sweep range 
         coeff_idx = np.arange(coeff_range[0], coeff_range[1], coeff_range[2])
         
-        iterator = trange(self.num_of_coeffs)
-        for idx in iterator:
-            cost_temp = []
-            for coeff in coeff_idx:
-                coeffs[idx] = coeff
-                zmask = self.create_upload_pattern(coeffs)
+
+        for iteration in range(1, self.total_iterations+1):   
+
+            iterator = trange(self.num_of_coeffs)
+            for idx in iterator:
+                cost_temp = []
+                for coeff in coeff_idx:
+                    coeffs[idx] = coeff
+                    zmask = self.create_upload_pattern(coeffs)
+                    
+                    # get interferogram from camera
+                    frame = self.data_in.get()
+
+                    # calculate cost function and save it
+                    cost_k = self.cost_callback(frame)
+                    cost_temp.append(cost_k)
                 
-                # get interferogram from camera
-                frame = self.camera.get()
+                counter += 1 
 
-                # calculate cost function and save it
-                cost_k = self.cost_callback(frame)
-                cost_temp.append(cost_k)
-            
-            counter += 1 
-
-            # update pattern with max corr
-            cost.append(np.max(cost_temp))            
-            coeffs[idx] = coeff_idx[np.argmax(cost_temp)]
-            
-            # just reload the optimal mask for this iteration and save 
-            # the corresponding frame
-            
-            zmask = self.create_upload_pattern(coeffs)
-            frame = self.camera.get()
-            
-            frames[counter] = frame
-            masks[counter] = zmask
-            
-            # print out status message
-            descr = [f"Iteration #: {idx}"]
-            iterator.set_description(' | '.join(descr))
-            iterator.set_postfix(Cost=cost[idx])
-            iterator.refresh()
+                # update pattern with max corr
+                cost.append(np.max(cost_temp))            
+                coeffs[idx] = coeff_idx[np.argmax(cost_temp)]
+                
+                # just reload the optimal mask for this iteration and save 
+                # the corresponding frame
+                
+                zmask = self.create_upload_pattern(coeffs)
+                frame = self.data_in.get()
+                if self.camera:
+                    frame_camera = self.camera.get()
+                    frames_camera[counter] = frame_camera
+                    self.data_out["frames_camera"] = frames_camera
+                frames[counter] = frame
+                masks[counter] = zmask
+                
+                # print out status message
+                descr = [f"Iteration #: {idx}"]
+                iterator.set_description(' | '.join(descr))
+                iterator.set_postfix(Cost=cost[idx])
+                iterator.refresh()
             
             # save all into a big dict
             self.data_out["coeffs"] = coeffs

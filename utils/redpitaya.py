@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import time
 
 from .redpitaya_scpi import scpi
 from ..utils.misc import CommonMethods
@@ -118,3 +119,30 @@ class RedPitaya(CommonMethods):
         ax.legend(loc='upper right', bbox_to_anchor=(1, 1), prop={'size': 8})
     
         return fig
+    
+    def sine(self, waveform='sine', freq=1000, amp=1):
+        
+        self.rp.tx_txt('GEN:RST')
+
+        self.rp.tx_txt('SOUR1:FUNC ' + str(waveform).upper())
+        self.rp.tx_txt('SOUR1:FREQ:FIX ' + str(freq))
+        self.rp.tx_txt('SOUR1:VOLT ' + str(amp))
+    
+        self.rp.tx_txt('OUTPUT:STATE ON')
+        self.rp.tx_txt('SOUR:TRig:INT')
+        
+        self.rp.close()
+        
+    def sine_on_off(self, freq=3280, amp=0.1, gate=0.1, cycles=10):
+        cycle = 0
+        while cycle < cycles:
+            self.sine(freq=freq, amp=amp)
+            time.sleep(gate)
+            self.off()
+            cycle += 1
+            
+    def off(self):
+        self.rp.tx_txt('OUTPUT:STATE OFF')
+
+    def close(self):
+        self.rp.close()

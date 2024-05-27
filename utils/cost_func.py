@@ -18,7 +18,7 @@ def correlation_coefficient(X, Y):
     return corr_coeff
 
 
-def signal_to_noise_ration2d(data, mask_radius=1):
+def signal_to_noise_ratio1d(data, mask_radius=1):
 
     center = np.argmax(data)
 
@@ -32,7 +32,7 @@ def signal_to_noise_ration2d(data, mask_radius=1):
     
     return cost
 
-def signal_to_noise_ratio(frame, mask_radius=8, mask_offset=(0, 0), intesity_only=False):
+def signal_to_noise_ratio2d(frame, mask_radius=8, mask_offset=(0, 0), intesity_only=False):
     """ Thank you S. Popoff
         Creates mask with a disk in the center and calculates the ratio of the
         pixel intensity in the disk to the pixel intensity outside the disk.
@@ -63,3 +63,15 @@ def max_of_spectrum(spectrum):
 def peak_to_peak(time_series):
     """ Take a times series and returns the peak to peak voltage"""
     return np.ptp(time_series)
+
+def CRB_from_images(camera, exp, freq, amp=0.1, **afg_config):
+    frame = camera.get()
+    
+    afg = exp.create_hardware('redpi', **afg_config)
+    afg.sine(freq, amp)
+    
+    frame_jitter = camera.get()
+    afg.exp.create_hardware('redpi', **afg_config)
+    afg.reset()
+    
+    

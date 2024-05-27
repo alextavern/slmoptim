@@ -42,8 +42,10 @@ class ZeluxCamera(CommonMethods):
         # camera instance
         self.sdk = TLCameraSDK()
         available_cameras = self.sdk.discover_available_cameras()
-        self.camera = self.sdk.open_camera(available_cameras[0])
-
+        if not self.id:
+            self.camera = self.sdk.open_camera(available_cameras[0])
+        else: 
+            self.camera = self.sdk.open_camera(str(self.id))
         # configure
         self.camera.exposure_time_us = self.exposure_time  # set exposure to 11 ms
         self.camera.frames_per_trigger_zero_for_unlimited = 0  # start camera in continuous mode
@@ -69,16 +71,22 @@ class ZeluxCamera(CommonMethods):
         self.camera.dispose()
         self.sdk.dispose()  
         
-    def get(self):
+    def get(self, timestamp=False):
         """ Get frame from zelux thorlabs camera
         """
-        frame = self.camera.get_pending_frame_or_null()
-        image_buffer = np.copy(frame.image_buffer)
+        frames = {}
+        timestamps = []
         
-        return image_buffer
+        for idx in range(self.num_of_frames):
+            frame = self.camera.get_pending_frame_or_null()
+            frames[idx] = np.copy(frame.image_buffer)
+            timestamps.append(frame.time_stamp_relative_ns_or_null)
+        
+        # add timestamp into a tuple along with acquired frames
+        if timestamp: frames = (frames, timestamps)
+        
+        return frames
     
-    
-
 def set_roi(roi_size, roi_off):
     offset_x, offset_y = roi_off
     middle_x = int(1440 / 2) + offset_x
