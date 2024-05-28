@@ -2,7 +2,7 @@ from ..initializer.init_experiment import InitExperiment
 from ..loader import patterns as pt
 
 from ..optimizer import transmission_matrix, phase_conjugation
-from ..utils import plot_func
+from ..utils import misc
 
 from slmPy import slmpy
 

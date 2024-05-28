@@ -1,8 +1,13 @@
 import threading
-from ..loader import patterns as pt
 from tqdm.auto import tqdm
 import numpy as np
-import time, cv2
+import time
+import cv2
+
+from slmPy import slmpy
+
+from .misc import CommonMethods
+from ..loader import patterns as pt
 
 
 def set_mirror(slm, resolution=(800, 600)):
@@ -12,6 +17,27 @@ def set_mirror(slm, resolution=(800, 600)):
     slm.sendArray(mirror)
     time.sleep(.2)
     
+    
+class SpatialLightModulator(CommonMethods):
+    
+    def __init__(self, **config):
+        
+        print("SLM initiliazed - use init_slm() to launch it")
+        CommonMethods.get_params(self, **config)
+        
+    def init_slm(self):
+        """ initializes slmpy SLM
+        """
+        if self.remote:
+            self.slm = slmpy.Client()
+            self.slm.start(self.server)
+        else:    
+            self.slm = slmpy.SLMdisplay(self.monitor)
+        return self.slm
+    
+    def close_slm(self):
+        self.slm.close()
+            
 class SlmUploadPatternsThread(threading.Thread):
     
     def __init__(self, slm, download_frame_event, upload_pattern_event, stop_all_event, calib_px=112, num_in=16, slm_macropixel_size=5, path=None):

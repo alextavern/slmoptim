@@ -158,103 +158,12 @@ class PatternsBacic:
 
         return pattern.astype('uint8')
 
-    # @staticmethod
-    # def _get_hadamard_basis(dim):
-    #     """
-    #     calculates the outer product of all combination of the rows of a hadamard matrix of a given order to
-    #     generate 2d patterns that constitute a hadamard basis.
-    #     Parameters
-    #     ----------
-    #     dim: the dimensions of each basis vector dim x dim (int)
+    def random(self, dim):
+        """ Creates a random mask of dimensions dim x dim """
 
-    #     Returns
-    #     -------
-    #     matrices: all the 2d patterns (array)
-
-    #     """
-        
-    #     order = int((np.log2(dim)))
-
-    #     h = hadamard(2 ** order)
-    #     matrices = [np.outer(h[i], h[j]) for i in range(0, len(h)) for j in range(0, len(h))]
-    #     return matrices
-
-    @staticmethod
-    def _get_hadamard_vector(order, i, j):
-        """
-        calculates the (i,j)th vector of a hadamard basis of a given order
-        Parameters
-        ----------
-        order: int
-        i: int
-        j: int
-
-        Returns
-        -------
-        2d array
-
-        """
-        h = hadamard(2 ** order)
-        matrix = np.outer(h[i], h[j])
-        return matrix
-
-    def _hadamard_int2phase(self, vector):
-        """
-        replaces the elements of an hadamard vector (-1, 1) with the useful slm values (0, pi)
-        one needs to know the grayscale value of the slm that gives a phase shift of pi
-        Parameters
-        ----------
-        vector: 2d array
-
-        Returns
-        -------
-        vector: 2d array
-
-        """
-        vector[vector == -1] = 0     # phi = 0
-        vector[vector == 1] = self.grayphase / 2  # phi = pi
-        return vector
-
-    def hadamard_pattern(self, dim, hadamard_vector_idx, n=1, gray=0):
-        """
-        creates a hadamard vector and puts it in the middle of the slm screen
-        Parameters
-        ----------
-        dim: hadamard matrix dimension dim x dim (int)
-        hadamard_vector_idx: input of the index of the hadamard vector (tuple with 2 int)
-        n: hadamard vector magnification factor
-        gray: grayscale level of the unaffected slm screen (int)
-
-        Returns
-        -------
-        pattern: 2d array
-
-        """
-        # create a 2d array
-        rows = self.res_x
-        cols = self.res_y
-        # make sure that the image is composed by 8bit integers between 0 and 255
-        pattern = np.full(shape=(cols, rows), fill_value=gray).astype('uint8')
-
-        # get a 2d hadamard vector
-        order = int((np.log2(dim)))
-
-        i, j = hadamard_vector_idx[0], hadamard_vector_idx[1]
-        hadamard_vector = self._get_hadamard_vector(order, i, j)
-        # enlarge vector
-        hadamard_vector = self._enlarge_pattern(hadamard_vector, n)
-        # replace values to grayscale-phase values
-        hadamard_vector = self._hadamard_int2phase(hadamard_vector)
-
-        # put it in the middle of the slm screen
-        # first calculate offsets from the image center
-        subpattern_dim = hadamard_vector.shape
-        offset_x = int(rows / 2 - subpattern_dim[0] / 2)
-        offset_y = int(cols / 2 - subpattern_dim[1] / 2)
-        # and then add the vector in the center of the initialized pattern
-        pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = hadamard_vector
-
-        return hadamard_vector, pattern.astype('uint8')
+        phase_list = np.arange(0, 2 * self.grayphase + 1, self.grayphase / 4)
+        pattern = np.array([[random.choice(phase_list) for i in range(dim)] for j in range(dim)])
+        return pattern.astype('uint8')
 
     def pattern_to_SLM(self, vector, n=1, gray=0, off=(0, 0)):
         """
@@ -293,44 +202,11 @@ class PatternsBacic:
 
         return pattern.astype('uint8')
     
-    def random(self, dim):
-
-        phase_list = np.arange(0, 2 * self.grayphase + 1, self.grayphase / 4)
-        pattern = np.array([[random.choice(phase_list) for i in range(dim)] for j in range(dim)])
-        return pattern.astype('uint8')
-
-
-    # def add_subpattern(self, subpattern, gray=0):
-    #     """_summary_
-
-    #     Args:
-    #         subpattern (_type_): _description_
-    #         gray (int, optional): _description_. Defaults to 0.
-
-    #     Returns:
-    #         _type_: _description_
-    #     """
-    #     # create a 2d array
-    #     rows = self.res_x
-    #     cols = self.res_y
-    #     # make sure that the image is composed by 8bit integers between 0 and 255
-    #     pattern = np.full(shape=(cols, rows), fill_value=gray).astype('uint8')
-        
-    #     # put it in the middle of the slm screen
-    #     # first calculate offsets from the image center
-    #     subpattern_dim = subpattern.shape
-    #     offset_x = int(rows / 2 - subpattern_dim[0] / 2)
-    #     offset_y = int(cols / 2 - subpattern_dim[1] / 2)
-    #     # and then add the vector in the center of the initialized pattern
-    #     pattern[offset_y:offset_y + subpattern_dim[0], offset_x:offset_x + subpattern_dim[1]] = subpattern
-
-    #     return pattern.astype('uint8')
-        
     @staticmethod
     def _enlarge_pattern(matrix, n):
         """
         It takes as input a 2d matrix and augments its dimensions by 2^(n-1) by conserving the same pattern
-        To be removed. The 2^(n-1) factor is not well adapted as it leaed to underfilling the useful slm screen.
+        To be removed. The 2^(n-1) factor is not well adapted as it leads to underfilling of the effectif slm screen.
         Parameters
         ----------
         matrix: input 2d array
