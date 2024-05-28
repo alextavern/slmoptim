@@ -64,14 +64,51 @@ def peak_to_peak(time_series):
     """ Take a times series and returns the peak to peak voltage"""
     return np.ptp(time_series)
 
-def CRB_from_images(camera, exp, freq, amp=0.1, **afg_config):
-    frame = camera.get()
+def optomechanical_waist(frames):
+    """ Implements an optomechanical waist parameter-based cost function
+        (see VB these p. 93). To use with an iterative optimization method.
+    """
+        
+    num_of_frames = len(frames)
     
-    afg = exp.create_hardware('redpi', **afg_config)
-    afg.sine(freq, amp)
+    # create a zero 2d array on which the measurement mode will be averaged
+    shape = frames[0].shape
+    meas_mode_avg =  np.zeros((shape[0], shape[1]))
+
+    for idx in range(1, num_of_frames):
+        # difference between the square roots of two frames
+        frame_diff = (frames[idx-1] - frames[idx]) / (frames[idx] ** 0.5)
+
+        meas_mode_avg += frame_diff / num_of_frames
+
+    return meas_mode_avg
     
-    frame_jitter = camera.get()
-    afg.exp.create_hardware('redpi', **afg_config)
-    afg.reset()
+def measurement_mode(frames):
+    """ calculating measurement mode from a series of frames
+    """
+    
+    num_of_frames = len(frames)
+    
+    # create a zero 2d array on which the measurement mode will be averaged
+    shape = frames[0].shape
+    meas_mode_avg =  np.zeros((shape[0], shape[1]))
+
+    for idx in range(1, num_of_frames):
+        # difference between the square roots of two frames
+        frame_diff = (frames[idx-1] ** 0.5 - frames[idx] ** 0.5)
+
+        # normalization factor of this particular differnce
+        frame_diff_squared = frame_diff ** 2
+        norm_factor = frame_diff_squared.sum() ** 0.5
+
+        # normalize
+        frame_diff_norm = frame_diff / norm_factor
+        # correct sign otherwise everything will be averaged to zero
+        frame_diff_norm *= np.sign(frame_diff_norm)
+        
+        # average 
+        meas_mode_avg += frame_diff / num_of_frames
+
+    return meas_mode_avg
     
     

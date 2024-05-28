@@ -20,21 +20,36 @@ hardware:
   camera:
     name: ccd
     params:
+      id: 22787
       roi_size: 600
       offset: [0, 0]
       macropixel: 4
       exposure_time: 100
       gain: 1
       timeout: 100
-  
+
   daq:
+    name: pico
+    params:
+      num_of_samples: 10000
+      sampling_rate: 50000 
+      num_of_avg: 100
+      channel: 1
+      coupling: 0
+      voltage_range: 5
+      offset: 0
+      trigger: 0
+      fourier: True
+      frequency_range: [0, 1000]
+
+  daq2:
     name: redpi
     params:
       IP: '172.24.40.32'
       IP2: '172.24.40.69'
       number_of_samples: 16384
       clock: 125000000
-      decimation: 8192
-      number_of_avg: 2
+      decimation: 1024
+      num_of_avg: 100
       offset: 1
-      source: 2
+      channel: 2
