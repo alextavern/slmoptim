@@ -38,10 +38,6 @@ class IterationAlgos(CommonMethods):
                 
         # define a filepath to save data and figs
         self.filepath = CommonMethods.create_filepath(self)
-     
-    def _get_params(self, **config):
-        for key, value in config.items():
-            setattr(self, key, value) # sets the instanitated class as an attrinute of this class
  
     def register_callback(self, callback):
         """ This callback function is used to pass a custom cost function
@@ -237,7 +233,7 @@ class StepwiseSequential(IterationAlgos):
             self.final_pattern = self.final_pattern_k.copy()
 
         return self.final_pattern, self.cost, self.frames
-    
+
 class RandomPartition(IterationAlgos):
     
     def run(self):
