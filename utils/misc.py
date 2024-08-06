@@ -1,6 +1,7 @@
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
-import numpy as np
+import numpy as np    
+import paramiko
 import pickle
 import time
 import os
@@ -52,6 +53,7 @@ class CommonMethods:
 
         with open(self.filepath + '_' + type + '.pkl', 'wb') as fp:
             pickle.dump((self.data_out), fp)
+            
 
 def pattern_frame(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600),
                   off=(0, 0), 
@@ -68,7 +70,7 @@ def pattern_frame(slm, camera, pattern, slm_macropixel, slm_resolution=(800, 600
         slm.updateArray(pattern)
     
     time.sleep(0.5)
-    frame = camera.get()
+    frame = camera.get_one_frame()
     # frame = np.copy(frame.image_buffer)
     
     if norm:
@@ -128,3 +130,21 @@ def set_cross_had(slm, resX=800, resY=600, idx=17*8):
     patSLM = pt.PatternsBacic(resX, resY)
     cross = patSLM.pattern_to_SLM(had_loader[idx], 15)
     slm.sendArray(cross)
+    
+def kill_and_restart_slm():
+    
+    # command to run the bash script in the slm-rasbpi
+    command = "./kill_restart_server.sh python3.9"
+
+    # ssh rasbpi
+    host = "10.42.0.234"
+    username = "pi"
+    password = "optomeca"
+
+    ssh = paramiko.client.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(host, username=username, password=password)
+    _stdin, _stdout,_stderr = ssh.exec_command(command)
+    print(_stdout.read().decode())
+
+    ssh.close()

@@ -71,8 +71,16 @@ class ZeluxCamera(CommonMethods):
         self.camera.dispose()
         self.sdk.dispose()  
         
+    def get_one_frame(self):
+        """ Get one frames from zelux thorlabs camera
+        """        
+        
+        frame = self.camera.get_pending_frame_or_null()
+        
+        return np.copy(frame.image_buffer)
+        
     def get(self, timestamp=False):
-        """ Get frame from zelux thorlabs camera
+        """ Get frames from zelux thorlabs camera, return a dict with frames
         """
         frames = {}
         timestamps = []

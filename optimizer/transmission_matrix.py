@@ -143,7 +143,7 @@ class measTM(CommonMethods):
                 time.sleep(slm_delay) # wait to make sure the vector is loaded
                 
                 # get frame for each phase
-                frame =self.camera.get()
+                frame = self.camera.get_one_frame()
                 
                 # check saturation
                 max_level = np.amax(frame)
@@ -380,7 +380,7 @@ class calcTM(CommonMethods):
     def plot(self):
 
         # get frame with focus mask
-        frame_focus = self.camera.get()
+        frame_focus = self.camera.get_one_frame()
         profile_line = len(frame_focus) // 2 
 
         # set mirror to get speckle
@@ -388,7 +388,7 @@ class calcTM(CommonMethods):
         mirror = patSLM.mirror()
         self.slm.sendArray(mirror)
         time.sleep(.2)
-        frame_speckle = self.camera.get()
+        frame_speckle = self.camera.get_one_frame()
 
         # do the plotting
         fig, axs = plt.subplots(2, 2, figsize=(10,10))
